@@ -12,6 +12,8 @@ const (
 	EmbeddingModel = "nomic-embed-text"
 )
 
+var BaseURL = "http://localhost:11434" // Default value
+
 type EmbeddingRequest struct {
 	Model  string `json:"model"`
 	Prompt string `json:"prompt"`
@@ -30,7 +32,7 @@ func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 		return nil, fmt.Errorf("failed to marshal JSON: %v", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:11434/api/embeddings", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", BaseURL+"/api/embeddings", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}

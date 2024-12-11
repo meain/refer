@@ -9,6 +9,7 @@ import (
 	"github.com/alecthomas/kong"
 	_ "github.com/mattn/go-sqlite3"
 	"lit/cmd"
+	"lit/internal/config"
 	"lit/internal/db"
 	"lit/internal/embedding"
 	"lit/internal/fileutil"
@@ -16,6 +17,13 @@ import (
 
 func main() {
 	ctx := context.Background()
+
+	// Load config
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Warning: using default config: %v", err)
+	}
+	embedding.BaseURL = cfg.EmbeddingBaseURL
 
 	// Parse command-line arguments
 	var cli cmd.CLI
