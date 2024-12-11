@@ -141,6 +141,19 @@ func addDocument(ctx context.Context, db *sql.DB, filePath string) error {
 		return fmt.Errorf("failed to serialize embedding: %v", err)
 	}
 
+	// Check if document already exists, delete it if so
+	var exists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM documents WHERE filepath = ?)", filePath).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if document exists: %v", err)
+	}
+	if exists {
+		_, err = db.Exec("DELETE FROM documents WHERE filepath = ?", filePath)
+		if err != nil {
+			return fmt.Errorf("failed to delete existing document: %v", err)
+		}
+	}
+
 	// Insert document with vector embedding
 	_, err = db.Exec(
 		"INSERT INTO documents(filepath, content, embedding) VALUES (?, ?, ?)",
