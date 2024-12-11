@@ -258,15 +258,10 @@ func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 			fmt.Printf("%d. %s (%.4f)\n", count, filepath, distance)
 		}
 	} else if format == "llm" {
-		var llmQuery struct {
-			Filetype string `json:"filetype"`
-			Prompts  []struct {
-				Filepath string  `json:"filepath"`
-				Contents string  `json:"contents"`
-				Score    float64 `json:"score"`
-			} `json:"prompts"`
+		var llmQuery []struct {
+			Filepath string
+			Contents string
 		}
-		llmQuery.Filetype = "text"
 		for rows.Next() {
 			var rowid int
 			var filepath string
@@ -278,21 +273,20 @@ func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 			}
 
 			count++
-			llmQuery.Prompts = append(llmQuery.Prompts, struct {
-				Filepath string  `json:"filepath"`
-				Contents string  `json:"contents"`
-				Score    float64 `json:"score"`
+			llmQuery = append(llmQuery, struct {
+				Filepath string
+				Contents string
 			}{
 				Filepath: filepath,
 				Contents: content,
-				Score:    distance,
 			})
 		}
-		llmJSON, err := json.MarshalIndent(llmQuery, "", "\t")
-		if err != nil {
-			return err
+
+		for _, item := range llmQuery {
+			fmt.Printf("Filepath: %s\n", item.Filepath)
+			fmt.Printf("Contents: \n%s\n", item.Contents)
+			fmt.Println("------------------------------------------------------")
 		}
-		fmt.Println(string(llmJSON))
 	} else {
 		return fmt.Errorf("unknown format: %s", format)
 	}
