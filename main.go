@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -110,6 +111,18 @@ func createEmbedding(ctx context.Context, text string) ([]float32, error) {
 }
 
 func addDocument(ctx context.Context, db *sql.DB, filePath string) error {
+	// Check if file is a text file
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file %q: %v", filePath, err)
+	}
+	if fileInfo.IsDir() {
+		return nil
+	}
+	if !isTextFile(filePath) {
+		return nil
+	}
+
 	// Read file content
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -138,6 +151,35 @@ func addDocument(ctx context.Context, db *sql.DB, filePath string) error {
 
 	fmt.Printf("Document added: %s\n", filePath)
 	return nil
+}
+
+func isTextFile(filePath string) bool {
+	// Try to read the first 512 bytes of the file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false
+	}
+	if len(data) == 0 {
+		return true
+	}
+	isBinary := false
+	for _, b := range data {
+		if b == 0 {
+			isBinary = true
+			break
+		}
+		if b > 127 && !isPrintable(b) {
+			isBinary = true
+			break
+		}
+	}
+	return !isBinary
+}
+
+func isPrintable(b byte) bool {
+	// Most printable characters are in the range of 32 to 126 in ASCII
+	// and in the range of 192 to 255 in ISO 8859-1
+	return (b >= 32 && b <= 126) || (b >= 192 && b <= 255)
 }
 
 func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int) error {
@@ -209,19 +251,45 @@ func main() {
 	switch os.Args[1] {
 	case "add":
 		if len(os.Args) < 3 {
-			log.Fatal("Usage: ./lit add <filepath>")
-		}
-		// Resolve absolute path
-		filePath, err := filepath.Abs(os.Args[2])
-		if err != nil {
-			log.Fatalf("Failed to resolve file path: %v", err)
+			log.Fatal("Usage: ./lit add <filepath>...")
 		}
 
-		// Add document
-		if err := addDocument(ctx, db, filePath); err != nil {
-			log.Fatalf("Failed to add document: %v", err)
-		}
+		// Process provided files/folders
+		for _, arg := range os.Args[2:] {
+			// Resolve absolute path
+			filePath, err := filepath.Abs(arg)
+			if err != nil {
+				log.Printf("Failed to resolve file path %q: %v", arg, err)
+				continue
+			}
 
+			// Add document if it's a file
+			if fileInfo, err := os.Stat(filePath); err != nil {
+				log.Printf("Failed to stat file %q: %v", arg, err)
+			} else if !fileInfo.IsDir() {
+				if err := addDocument(ctx, db, filePath); err != nil {
+					log.Printf("Failed to add document %q: %v", arg, err)
+				}
+			} else {
+				// Walk directory and add documents recursively
+				err = filepath.WalkDir(filePath, func(path string, dirEntry fs.DirEntry, err error) error {
+					if err != nil {
+						log.Printf("Failed to walk directory %q: %v", arg, err)
+						return err
+					}
+
+					if !dirEntry.IsDir() {
+						if err := addDocument(ctx, db, path); err != nil {
+							log.Printf("Failed to add document %q: %v", path, err)
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					log.Printf("Failed to walk directory %q: %v", arg, err)
+				}
+			}
+		}
 	case "search":
 		if len(os.Args) < 3 {
 			log.Fatal("Usage: ./lit search <query>")
