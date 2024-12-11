@@ -24,6 +24,7 @@ func main() {
 		log.Printf("Warning: using default config: %v", err)
 	}
 	embedding.BaseURL = cfg.EmbeddingBaseURL
+	embedding.Model = cfg.EmbeddingModel
 
 	// Parse command-line arguments
 	var cli cmd.CLI

@@ -8,12 +8,14 @@ import (
 
 type Config struct {
 	EmbeddingBaseURL string `json:"embedding_base_url"`
+	EmbeddingModel   string `json:"embedding_model"`
 }
 
 func LoadConfig() (*Config, error) {
 	// Default config
 	cfg := &Config{
-		EmbeddingBaseURL: "http://localhost:11434",
+		EmbeddingBaseURL: "http://localhost:11434/api/embeddings",
+		EmbeddingModel:   "nomic-embed-text",
 	}
 
 	// Get config file path

@@ -8,11 +8,10 @@ import (
 	"net/http"
 )
 
-const (
-	EmbeddingModel = "nomic-embed-text"
+var (
+	BaseURL = "http://localhost:11434/api/embeddings" // Default value
+	Model   = "nomic-embed-text"                      // Default value
 )
-
-var BaseURL = "http://localhost:11434" // Default value
 
 type EmbeddingRequest struct {
 	Model  string `json:"model"`
@@ -22,7 +21,7 @@ type EmbeddingRequest struct {
 func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	// Create a new HTTP request
 	data := EmbeddingRequest{
-		Model:  EmbeddingModel,
+		Model:  Model,
 		Prompt: text,
 	}
 
@@ -32,7 +31,7 @@ func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 		return nil, fmt.Errorf("failed to marshal JSON: %v", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", BaseURL+"/api/embeddings", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", BaseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
