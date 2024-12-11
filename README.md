@@ -15,6 +15,22 @@
 - [Ollama](https://ollama.ai) running locally with the `nomic-embed-text` model
 - SQLite with [sqlite-vec](https://github.com/asg017/sqlite-vec) extension
 
+## Configuration
+
+`lit` can be configured via a JSON file located at `~/.config/lit/config.json`. The following settings are available:
+
+```json
+{
+    "embedding_base_url": "http://localhost:11434/api/embeddings",
+    "embedding_model": "nomic-embed-text"
+}
+```
+
+- `embedding_base_url`: The URL of your Ollama API endpoint
+- `embedding_model`: The embedding model to use
+
+If no config file is present, these default values will be used.
+
 ## Installation
 
 ```bash
