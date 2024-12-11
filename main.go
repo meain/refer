@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/alecthomas/kong"
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -21,6 +22,22 @@ const (
 	embeddingModel = "nomic-embed-text"
 	embeddingDim   = 768 // Typical dimension for nomic-embed-text
 )
+
+type CLI struct {
+	Add    Add    `kong:"cmd"`
+	Search Search `kong:"cmd"`
+}
+
+type Add struct {
+	FilePath  string `kong:"arg,required"`
+	Recursive bool   `kong:"help='Recursive'"`
+}
+
+type Search struct {
+	Query  string `kong:"arg,required"`
+	Format string `kong:"default='names'"`
+	Limit  int    `kong:"default=5"`
+}
 
 func initDatabase() (*sql.DB, error) {
 	// Ensure sqlite-vec is loaded
@@ -175,6 +192,10 @@ func isTextFile(filePath string) bool {
 	if len(data) == 0 {
 		return true
 	}
+	limit := 512
+	if len(data) > limit {
+		data = data[:limit]
+	}
 	isBinary := false
 	for _, b := range data {
 		if b == 0 {
@@ -195,7 +216,7 @@ func isPrintable(b byte) bool {
 	return (b >= 32 && b <= 126) || (b >= 192 && b <= 255)
 }
 
-func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int) error {
+func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format string) error {
 	// Serialize the query embedding
 	serializedQuery, err := sqlite_vec.SerializeFloat32(queryEmbedding)
 	if err != nil {
@@ -204,36 +225,81 @@ func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int) error {
 
 	// Perform vector similarity search
 	rows, err := db.Query(`
-		SELECT 
-			rowid, 
-			filepath, 
-			distance 
-		FROM documents 
-		WHERE embedding match ?
-		ORDER BY distance 
-		LIMIT ?
-	`, serializedQuery, limit)
+        SELECT 
+            rowid, 
+            filepath, 
+            content,
+            distance 
+        FROM documents 
+        WHERE embedding match ?
+        ORDER BY distance 
+        LIMIT ?
+    `, serializedQuery, limit)
 	if err != nil {
 		return fmt.Errorf("search query failed: %v", err)
 	}
 	defer rows.Close()
+	var count int
 
 	// Print results
-	fmt.Println("Search Results:")
-	var count int
-	for rows.Next() {
-		var rowid int
-		var filepath string
-		var distance float64
+	if format == "names" {
+		fmt.Println("Search Results:")
+		for rows.Next() {
+			var rowid int
+			var filepath string
+			var content string
+			var distance float64
 
-		if err := rows.Scan(&rowid, &filepath, &distance); err != nil {
-			return fmt.Errorf("failed to scan row: %v", err)
+			if err := rows.Scan(&rowid, &filepath, &content, &distance); err != nil {
+				return fmt.Errorf("failed to scan row: %v", err)
+			}
+
+			count++
+			fmt.Printf("%d. %s (%.4f)\n", count, filepath, distance)
 		}
+	} else if format == "llm" {
+		var llmQuery struct {
+			Filetype string `json:"filetype"`
+			Prompts  []struct {
+				Filepath string  `json:"filepath"`
+				Contents string  `json:"contents"`
+				Score    float64 `json:"score"`
+			} `json:"prompts"`
+		}
+		llmQuery.Filetype = "text"
+		for rows.Next() {
+			var rowid int
+			var filepath string
+			var content string
+			var distance float64
 
-		count++
-		fmt.Printf("%d. %s (%.4f)\n", count, filepath, distance)
+			if err := rows.Scan(&rowid, &filepath, &content, &distance); err != nil {
+				return fmt.Errorf("failed to scan row: %v", err)
+			}
+
+			count++
+			llmQuery.Prompts = append(llmQuery.Prompts, struct {
+				Filepath string  `json:"filepath"`
+				Contents string  `json:"contents"`
+				Score    float64 `json:"score"`
+			}{
+				Filepath: filepath,
+				Contents: content,
+				Score:    distance,
+			})
+		}
+		llmJSON, err := json.MarshalIndent(llmQuery, "", "\t")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(llmJSON))
+	} else {
+		return fmt.Errorf("unknown format: %s", format)
 	}
 
+	if rows.Err() != nil {
+		return rows.Err()
+	}
 	if count == 0 {
 		fmt.Println("No results found.")
 	}
@@ -242,14 +308,11 @@ func searchDocuments(db *sql.DB, queryEmbedding []float32, limit int) error {
 }
 
 func main() {
-	// Check if at least one argument is provided
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: ./lit <command> [args]")
-		fmt.Println("Commands:")
-		fmt.Println("  add <filepath>    - Add a document to the database")
-		fmt.Println("  search <query>    - Search documents by query")
-		os.Exit(1)
-	}
+	ctx := context.Background()
+
+	// Parse command-line arguments
+	var cli CLI
+	kctx := kong.Parse(&cli)
 
 	// Initialize database
 	db, err := initDatabase()
@@ -258,69 +321,36 @@ func main() {
 	}
 	defer db.Close()
 
-	ctx := context.Background()
-
 	// Handle commands
-	switch os.Args[1] {
-	case "add":
-		if len(os.Args) < 3 {
-			log.Fatal("Usage: ./lit add <filepath>...")
-		}
-
-		// Process provided files/folders
-		for _, arg := range os.Args[2:] {
-			// Resolve absolute path
-			filePath, err := filepath.Abs(arg)
+	switch kctx.Command() {
+	case "add <file-path>":
+		err = filepath.WalkDir(cli.Add.FilePath, func(path string, dirEntry fs.DirEntry, err error) error {
 			if err != nil {
-				log.Printf("Failed to resolve file path %q: %v", arg, err)
-				continue
+				log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
+				return err
 			}
-
-			// Add document if it's a file
-			if fileInfo, err := os.Stat(filePath); err != nil {
-				log.Printf("Failed to stat file %q: %v", arg, err)
-			} else if !fileInfo.IsDir() {
-				if err := addDocument(ctx, db, filePath); err != nil {
-					log.Printf("Failed to add document %q: %v", arg, err)
-				}
-			} else {
-				// Walk directory and add documents recursively
-				err = filepath.WalkDir(filePath, func(path string, dirEntry fs.DirEntry, err error) error {
-					if err != nil {
-						log.Printf("Failed to walk directory %q: %v", arg, err)
-						return err
-					}
-
-					if !dirEntry.IsDir() {
-						if err := addDocument(ctx, db, path); err != nil {
-							log.Printf("Failed to add document %q: %v", path, err)
-						}
-					}
-					return nil
-				})
-				if err != nil {
-					log.Printf("Failed to walk directory %q: %v", arg, err)
+			if !dirEntry.IsDir() {
+				if err := addDocument(ctx, db, path); err != nil {
+					log.Printf("Failed to add document %q: %v", path, err)
 				}
 			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
 		}
-	case "search":
-		if len(os.Args) < 3 {
-			log.Fatal("Usage: ./lit search <query>")
-		}
-		query := os.Args[2]
-
+	case "search <query>":
 		// Generate embedding for search query
-		queryEmbedding, err := createEmbedding(ctx, query)
+		queryEmbedding, err := createEmbedding(ctx, cli.Search.Query)
 		if err != nil {
 			log.Fatalf("Failed to create query embedding: %v", err)
 		}
 
 		// Perform search
-		if err := searchDocuments(db, queryEmbedding, 5); err != nil {
+		if err := searchDocuments(db, queryEmbedding, cli.Search.Limit, cli.Search.Format); err != nil {
 			log.Fatalf("Search failed: %v", err)
 		}
-
 	default:
-		log.Fatalf("Unknown command: %s", os.Args[1])
+		panic("Unexpected command: " + kctx.Command())
 	}
 }
