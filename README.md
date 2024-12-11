@@ -63,7 +63,3 @@ lit search "your search query" --limit=10
    - Generates an embedding for your search query
    - Uses SQLite's vector similarity search to find matches
    - Returns results sorted by relevance
-
-## License
-
-MIT License - see LICENSE file for details
