@@ -13,7 +13,6 @@
 
 - Go 1.23 or later
 - [Ollama](https://ollama.ai) running locally with the `nomic-embed-text` model
-- SQLite with [sqlite-vec](https://github.com/asg017/sqlite-vec) extension
 
 ## Configuration
 
@@ -34,7 +33,7 @@ If no config file is present, these default values will be used.
 ## Installation
 
 ```bash
-go install github.com/yourusername/lit@latest
+go install github.com/meain/lit@latest
 ```
 
 ## Usage
