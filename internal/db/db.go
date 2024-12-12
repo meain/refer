@@ -14,8 +14,9 @@ const (
 
 // Document represents a stored document
 type Document struct {
-	ID   int64
-	Path string
+	ID      int64
+	Path    string
+	Content string
 }
 
 // GetAllDocuments retrieves all documents from the database
@@ -148,4 +149,20 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 	}
 
 	return nil
+}
+
+// GetDocumentByID retrieves a single document by its ID
+func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
+	var doc Document
+	err := db.QueryRow(`
+		SELECT rowid, filepath, content
+		FROM documents 
+		WHERE rowid = ?`, id).Scan(&doc.ID, &doc.Path, &doc.Content)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query document: %w", err)
+	}
+	return &doc, nil
 }

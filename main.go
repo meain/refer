@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"log"
 	"path/filepath"
@@ -87,6 +88,29 @@ func main() {
 				log.Printf("Failed to reindex document %q: %v", doc.Path, err)
 			}
 		}
+	case "show":
+		// List all documents
+		docs, err := db.GetAllDocuments(database)
+		if err != nil {
+			log.Fatalf("Failed to get documents: %v", err)
+		}
+		if len(docs) == 0 {
+			log.Println("No documents found in database")
+			return
+		}
+		for _, doc := range docs {
+			fmt.Printf("[%d] %s\n", doc.ID, doc.Path)
+		}
+	case "show <id>":
+		// Show specific document
+		doc, err := db.GetDocumentByID(database, *cli.Show.ID)
+		if err != nil {
+			log.Fatalf("Failed to get document with ID %d: %v", *cli.Show.ID, err)
+		}
+		if doc == nil {
+			log.Fatalf("No document found with ID %d", *cli.Show.ID)
+		}
+		fmt.Printf("%s\n%s\n", doc.Path, doc.Content)
 	default:
 		panic("Unexpected command: " + kctx.Command())
 	}

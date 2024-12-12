@@ -1,9 +1,10 @@
 package cmd
 
 type CLI struct {
-	Add     Add        `kong:"cmd"`
-	Search  Search     `kong:"cmd"`
-	Reindex ReindexCmd `kong:"cmd"`
+	Add     Add     `cmd:"" help:"Add a file or directory to the database"`
+	Search  Search  `cmd:"" help:"Search for documents"`
+	Show    Show    `cmd:"" help:"List documents in the database"`
+	Reindex Reindex `cmd:"" help:"Reindex all documents"`
 }
 
 type Add struct {
@@ -17,4 +18,8 @@ type Search struct {
 	Limit  int    `kong:"default=5"`
 }
 
-type ReindexCmd struct{}
+type Reindex struct{}
+
+type Show struct {
+	ID *int `arg:"" optional:"" help:"Optional document ID to show details for a specific document"`
+}
