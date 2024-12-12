@@ -166,6 +166,25 @@ func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
 	return &doc, nil
 }
 
+// RemoveDocument removes a document by its ID
+func RemoveDocument(db *sql.DB, id int) error {
+	result, err := db.Exec("DELETE FROM documents WHERE rowid = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to remove document: %v", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %v", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no document found with ID %d", id)
+	}
+
+	return nil
+}
+
 func GetDatabaseStats(db *sql.DB) (map[string]int, error) {
 	stats := make(map[string]int)
 

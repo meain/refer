@@ -6,6 +6,7 @@ type CLI struct {
 	Show    Show     `cmd:"" help:"List documents in the database"`
 	Stats   StatsCmd `cmd:"" help:"Show database statistics"`
 	Reindex Reindex  `cmd:"" help:"Reindex all documents"`
+	Remove  Remove   `cmd:"" help:"Remove a document from the database"`
 }
 
 type Add struct {
@@ -26,3 +27,7 @@ type Show struct {
 }
 
 type StatsCmd struct{}
+
+type Remove struct {
+	ID int `arg:"" help:"Document ID to remove"`
+}

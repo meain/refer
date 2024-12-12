@@ -119,6 +119,11 @@ func main() {
 
 		fmt.Printf("Documents: %d\n", stats["documents"])
 		fmt.Printf("Total Content Size: %s\n", formatBytes(stats["total_content_bytes"]))
+	case "remove <id>":
+		if err := db.RemoveDocument(database, cli.Remove.ID); err != nil {
+			log.Fatalf("Failed to remove document: %v", err)
+		}
+		fmt.Printf("Document %d removed successfully\n", cli.Remove.ID)
 	default:
 		panic("Unexpected command: " + kctx.Command())
 	}
