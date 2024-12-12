@@ -12,6 +12,34 @@ const (
 	EmbeddingDim = 768 // Typical dimension for nomic-embed-text
 )
 
+// Document represents a stored document
+type Document struct {
+	ID   int64
+	Path string
+}
+
+// GetAllDocuments retrieves all documents from the database
+func GetAllDocuments(db *sql.DB) ([]Document, error) {
+	rows, err := db.Query("SELECT rowid, filepath FROM documents")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query documents: %v", err)
+	}
+	defer rows.Close()
+
+	var docs []Document
+	for rows.Next() {
+		var doc Document
+		if err := rows.Scan(&doc.ID, &doc.Path); err != nil {
+			return nil, fmt.Errorf("failed to scan document: %v", err)
+		}
+		docs = append(docs, doc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating documents: %v", err)
+	}
+	return docs, nil
+}
+
 func InitDatabase() (*sql.DB, error) {
 	// Ensure sqlite-vec is loaded
 	sqlite_vec.Auto()

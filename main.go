@@ -6,13 +6,14 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/alecthomas/kong"
-	_ "github.com/mattn/go-sqlite3"
 	"lit/cmd"
 	"lit/internal/config"
 	"lit/internal/db"
 	"lit/internal/embedding"
 	"lit/internal/fileutil"
+
+	"github.com/alecthomas/kong"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -65,6 +66,19 @@ func main() {
 		// Perform search
 		if err := db.SearchDocuments(database, queryEmbedding, cli.Search.Limit, cli.Search.Format); err != nil {
 			log.Fatalf("Search failed: %v", err)
+		}
+	case "reindex":
+		// Get all documents from database
+		docs, err := db.GetAllDocuments(database)
+		if err != nil {
+			log.Fatalf("Failed to get documents: %v", err)
+		}
+
+		// Reindex each document
+		for _, doc := range docs {
+			if err := fileutil.AddDocument(ctx, database, doc.Path); err != nil {
+				log.Printf("Failed to reindex document %q: %v", doc.Path, err)
+			}
 		}
 	default:
 		panic("Unexpected command: " + kctx.Command())

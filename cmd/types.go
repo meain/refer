@@ -3,6 +3,7 @@ package cmd
 type CLI struct {
 	Add    Add    `kong:"cmd"`
 	Search Search `kong:"cmd"`
+	Reindex ReindexCmd `kong:"cmd"`
 }
 
 type Add struct {
@@ -15,3 +16,5 @@ type Search struct {
 	Format string `kong:"default='names'"`
 	Limit  int    `kong:"default=5"`
 }
+
+type ReindexCmd struct{}

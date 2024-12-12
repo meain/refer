@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"lit/internal/embedding"
+
+	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
 
 func IsTextFile(filePath string) bool {
@@ -60,6 +61,8 @@ func AddDocument(ctx context.Context, db *sql.DB, filePath string) error {
 		return fmt.Errorf("failed to read file: %v", err)
 	}
 
+	// TODO: Check if the file exists in DB, if it does, check if the contents
+	// match and only reindex if they are not the same.
 	// Generate embedding
 	embedding, err := embedding.CreateEmbedding(ctx, string(content))
 	if err != nil {
