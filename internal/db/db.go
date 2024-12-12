@@ -93,7 +93,6 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 
 	// Print results
 	if format == "names" {
-		fmt.Println("Search Results:")
 		for rows.Next() {
 			var rowid int
 			var filepath string
@@ -105,7 +104,7 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 			}
 
 			count++
-			fmt.Printf("%d. %s (%.4f)\n", count, filepath, distance)
+			fmt.Printf("%d: %s (%.4f)\n", rowid, filepath, distance)
 		}
 	} else if format == "llm" {
 		var llmQuery []struct {
