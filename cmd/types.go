@@ -1,8 +1,8 @@
 package cmd
 
 type CLI struct {
-	Add    Add    `kong:"cmd"`
-	Search Search `kong:"cmd"`
+	Add     Add        `kong:"cmd"`
+	Search  Search     `kong:"cmd"`
 	Reindex ReindexCmd `kong:"cmd"`
 }
 

@@ -11,6 +11,7 @@ import (
 	"lit/internal/db"
 	"lit/internal/embedding"
 	"lit/internal/fileutil"
+	"lit/internal/webutil"
 
 	"github.com/alecthomas/kong"
 	_ "github.com/mattn/go-sqlite3"
@@ -41,20 +42,26 @@ func main() {
 	// Handle commands
 	switch kctx.Command() {
 	case "add <file-path>":
-		err = filepath.WalkDir(cli.Add.FilePath, func(path string, dirEntry fs.DirEntry, err error) error {
+		if webutil.IsURL(cli.Add.FilePath) {
+			if err := fileutil.AddDocument(ctx, database, cli.Add.FilePath); err != nil {
+				log.Printf("Failed to add document %q: %v", cli.Add.FilePath, err)
+			}
+		} else {
+			err = filepath.WalkDir(cli.Add.FilePath, func(path string, dirEntry fs.DirEntry, err error) error {
+				if err != nil {
+					log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
+					return err
+				}
+				if !dirEntry.IsDir() {
+					if err := fileutil.AddDocument(ctx, database, path); err != nil {
+						log.Printf("Failed to add document %q: %v", path, err)
+					}
+				}
+				return nil
+			})
 			if err != nil {
 				log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
-				return err
 			}
-			if !dirEntry.IsDir() {
-				if err := fileutil.AddDocument(ctx, database, path); err != nil {
-					log.Printf("Failed to add document %q: %v", path, err)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
 		}
 	case "search <query>":
 		// Generate embedding for search query
