@@ -166,3 +166,25 @@ func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
 	}
 	return &doc, nil
 }
+
+func GetDatabaseStats(db *sql.DB) (map[string]int, error) {
+	stats := make(map[string]int)
+
+	// Get total number of documents
+	var docCount int
+	err := db.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count documents: %v", err)
+	}
+	stats["documents"] = docCount
+
+	// Get total size of all documents
+	var totalSize int
+	err = db.QueryRow("SELECT COALESCE(SUM(LENGTH(content)), 0) FROM documents").Scan(&totalSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate total content size: %v", err)
+	}
+	stats["total_content_bytes"] = totalSize
+
+	return stats, nil
+}

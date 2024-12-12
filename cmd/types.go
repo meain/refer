@@ -1,10 +1,11 @@
 package cmd
 
 type CLI struct {
-	Add     Add     `cmd:"" help:"Add a file or directory to the database"`
-	Search  Search  `cmd:"" help:"Search for documents"`
-	Show    Show    `cmd:"" help:"List documents in the database"`
-	Reindex Reindex `cmd:"" help:"Reindex all documents"`
+	Add     Add      `cmd:"" help:"Add a file or directory to the database"`
+	Search  Search   `cmd:"" help:"Search for documents"`
+	Show    Show     `cmd:"" help:"List documents in the database"`
+	Stats   StatsCmd `cmd:"" help:"Show database statistics"`
+	Reindex Reindex  `cmd:"" help:"Reindex all documents"`
 }
 
 type Add struct {
@@ -23,3 +24,5 @@ type Reindex struct{}
 type Show struct {
 	ID *int `arg:"" optional:"" help:"Optional document ID to show details for a specific document"`
 }
+
+type StatsCmd struct{}

@@ -111,7 +111,28 @@ func main() {
 			log.Fatalf("No document found with ID %d", *cli.Show.ID)
 		}
 		fmt.Printf("%s\n%s\n", doc.Path, doc.Content)
+	case "stats":
+		stats, err := db.GetDatabaseStats(database)
+		if err != nil {
+			log.Fatalf("Failed to get database stats: %v", err)
+		}
+
+		fmt.Printf("Documents: %d\n", stats["documents"])
+		fmt.Printf("Total Content Size: %s\n", formatBytes(stats["total_content_bytes"]))
 	default:
 		panic("Unexpected command: " + kctx.Command())
 	}
+}
+
+func formatBytes(bytes int) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
