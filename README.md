@@ -95,7 +95,7 @@ refer search "your search query"
 
 Use a different database file:
 ```bash
-refer --database=/path/to/db.sqlite search "query"
+refer --database=/path/to/referdb search "query"
 ```
 
 Get full content matches:
