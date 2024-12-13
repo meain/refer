@@ -1,4 +1,4 @@
-module lit
+module github.com/meain/refer
 
 go 1.23.3
 

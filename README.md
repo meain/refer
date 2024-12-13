@@ -1,6 +1,6 @@
-# lit - Local Intelligence Tool
+# refer - Local Intelligence Tool
 
-`lit` is a command-line tool for semantic search across your local files using embeddings. It allows you to find relevant files based on meaning rather than just keyword matching.
+`refer` is a command-line tool for semantic search across your local files using embeddings. It allows you to find relevant files based on meaning rather than just keyword matching.
 
 ## Features
 
@@ -16,7 +16,7 @@
 
 ## Configuration
 
-`lit` can be configured via a JSON file located at `~/.config/lit/config.json`. The following settings are available:
+`refer` can be configured via a JSON file located at `~/.config/refer/config.json`. The following settings are available:
 
 ```json
 {
@@ -33,7 +33,7 @@ If no config file is present, these default values will be used.
 ## Installation
 
 ```bash
-go install github.com/meain/lit@latest
+go install github.com/meain/refer@latest
 ```
 
 ## Usage
@@ -42,34 +42,34 @@ go install github.com/meain/lit@latest
 
 Add a single file:
 ```bash
-lit add path/to/file.txt
+refer add path/to/file.txt
 ```
 
 Add files recursively from a directory:
 ```bash
-lit add path/to/directory --recursive
+refer add path/to/directory --recursive
 ```
 
 ### Searching
 
 Search files (returns file names and similarity scores):
 ```bash
-lit search "your search query"
+refer search "your search query"
 ```
 
 Get full content matches:
 ```bash
-lit search "your search query" --format=llm
+refer search "your search query" --format=llm
 ```
 
 Limit results:
 ```bash
-lit search "your search query" --limit=10
+refer search "your search query" --limit=10
 ```
 
 ## How it Works
 
-1. When adding files, `lit`:
+1. When adding files, `refer`:
    - Checks if they are text files
    - Generates embeddings using the nomic-embed-text model
    - Stores the file path, content, and embedding in SQLite

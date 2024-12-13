@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	DBPath       = ".litdb"
+	DBPath       = ".referdb"
 	EmbeddingDim = 768 // Typical dimension for nomic-embed-text
 )
 

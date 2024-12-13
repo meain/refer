@@ -7,11 +7,11 @@ import (
 	"log"
 	"path/filepath"
 
-	"lit/internal/config"
-	"lit/internal/db"
-	"lit/internal/embedding"
-	"lit/internal/fileutil"
-	"lit/internal/webutil"
+	"github.com/meain/refer/internal/config"
+	"github.com/meain/refer/internal/db"
+	"github.com/meain/refer/internal/embedding"
+	"github.com/meain/refer/internal/fileutil"
+	"github.com/meain/refer/internal/webutil"
 
 	"github.com/alecthomas/kong"
 	_ "github.com/mattn/go-sqlite3"

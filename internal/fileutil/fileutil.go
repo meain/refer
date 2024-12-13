@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"lit/internal/embedding"
-	"lit/internal/webutil"
+	"github.com/meain/refer/internal/embedding"
+	"github.com/meain/refer/internal/webutil"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )

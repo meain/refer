@@ -24,7 +24,7 @@ func LoadConfig() (*Config, error) {
 		return cfg, nil // Return defaults if can't get config dir
 	}
 
-	configPath := filepath.Join(configDir, "lit", "config.json")
+	configPath := filepath.Join(configDir, "refer", "config.json")
 	
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
