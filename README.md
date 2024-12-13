@@ -4,6 +4,10 @@
 
 `refer` is a command-line tool for semantic search across your local files using embeddings. It allows you to find relevant files based on meaning rather than just keyword matching.
 
+https://github.com/user-attachments/assets/efc8c7fe-9fa3-43d4-9372-5af346591829
+
+_View the video on [Youtube](https://youtu.be/K5LfqEMUwL0) if you are having trouble viewing it here._
+
 ## Features
 
 - Semantic search using text embeddings (powered by Ollama's nomic-embed-text model)
