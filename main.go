@@ -7,7 +7,6 @@ import (
 	"log"
 	"path/filepath"
 
-	"lit/cmd"
 	"lit/internal/config"
 	"lit/internal/db"
 	"lit/internal/embedding"
@@ -17,6 +16,38 @@ import (
 	"github.com/alecthomas/kong"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+type CLI struct {
+	Add     Add      `cmd:"" help:"Add a file or directory to the database"`
+	Search  Search   `cmd:"" help:"Search for documents"`
+	Show    Show     `cmd:"" help:"List documents in the database"`
+	Stats   StatsCmd `cmd:"" help:"Show database statistics"`
+	Reindex Reindex  `cmd:"" help:"Reindex all documents"`
+	Remove  Remove   `cmd:"" help:"Remove a document from the database"`
+}
+
+type Add struct {
+	FilePath  []string `kong:"arg,required"`
+	Recursive bool     `kong:"help='Recursive'"`
+}
+
+type Search struct {
+	Query  string `kong:"arg,required"`
+	Format string `kong:"default='names'"`
+	Limit  int    `kong:"default=5"`
+}
+
+type Reindex struct{}
+
+type Show struct {
+	ID *int `arg:"" optional:"" help:"Optional document ID to show details for a specific document"`
+}
+
+type StatsCmd struct{}
+
+type Remove struct {
+	ID int `arg:"" help:"Document ID to remove"`
+}
 
 func main() {
 	ctx := context.Background()
@@ -30,7 +61,7 @@ func main() {
 	embedding.Model = cfg.EmbeddingModel
 
 	// Parse command-line arguments
-	var cli cmd.CLI
+	var cli CLI
 	kctx := kong.Parse(&cli)
 
 	// Initialize database
@@ -43,25 +74,27 @@ func main() {
 	// Handle commands
 	switch kctx.Command() {
 	case "add <file-path>":
-		if webutil.IsURL(cli.Add.FilePath) {
-			if err := fileutil.AddDocument(ctx, database, cli.Add.FilePath); err != nil {
-				log.Printf("Failed to add document %q: %v", cli.Add.FilePath, err)
-			}
-		} else {
-			err = filepath.WalkDir(cli.Add.FilePath, func(path string, dirEntry fs.DirEntry, err error) error {
-				if err != nil {
-					log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
-					return err
+		for _, f := range cli.Add.FilePath {
+			if webutil.IsURL(f) {
+				if err := fileutil.AddDocument(ctx, database, f); err != nil {
+					log.Printf("Failed to add document %q: %v", f, err)
 				}
-				if !dirEntry.IsDir() {
-					if err := fileutil.AddDocument(ctx, database, path); err != nil {
-						log.Printf("Failed to add document %q: %v", path, err)
+			} else {
+				err = filepath.WalkDir(f, func(path string, dirEntry fs.DirEntry, err error) error {
+					if err != nil {
+						log.Printf("Failed to walk directory %q: %v", f, err)
+						return err
 					}
+					if !dirEntry.IsDir() {
+						if err := fileutil.AddDocument(ctx, database, path); err != nil {
+							log.Printf("Failed to add document %q: %v", path, err)
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					log.Printf("Failed to walk directory %q: %v", f, err)
 				}
-				return nil
-			})
-			if err != nil {
-				log.Printf("Failed to walk directory %q: %v", cli.Add.FilePath, err)
 			}
 		}
 	case "search <query>":
