@@ -6,8 +6,10 @@
 
 - Semantic search using text embeddings (powered by Ollama's nomic-embed-text model)
 - Support for recursive directory scanning
+- Support for indexing web pages
 - Multiple output formats (file names or full content)
 - SQLite-based vector storage for fast similarity search
+- Document management (add, remove, reindex)
 
 ## Prerequisites
 
@@ -38,7 +40,7 @@ go install github.com/meain/refer@latest
 
 ## Usage
 
-### Adding Files
+### Adding Content
 
 Add a single file:
 ```bash
@@ -48,6 +50,38 @@ refer add path/to/file.txt
 Add files recursively from a directory:
 ```bash
 refer add path/to/directory --recursive
+```
+
+Add a web page:
+```bash
+refer add https://example.com/page.html
+```
+
+### Managing Documents
+
+Show all indexed documents:
+```bash
+refer show
+```
+
+Show specific document details:
+```bash
+refer show <id>
+```
+
+Remove a document:
+```bash
+refer remove <id>
+```
+
+Reindex all documents:
+```bash
+refer reindex
+```
+
+View database statistics:
+```bash
+refer stats
 ```
 
 ### Searching
