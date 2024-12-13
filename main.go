@@ -27,8 +27,7 @@ type CLI struct {
 }
 
 type Add struct {
-	FilePath  []string `kong:"arg,required"`
-	Recursive bool     `kong:"help='Recursive'"`
+	FilePath []string `kong:"arg,required"`
 }
 
 type Search struct {

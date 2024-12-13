@@ -1,4 +1,6 @@
-# refer - Local Intelligence Tool
+# refer
+
+> Unlock Meaningful Insights: Effortless Semantic Search Across Your Local Files
 
 `refer` is a command-line tool for semantic search across your local files using embeddings. It allows you to find relevant files based on meaning rather than just keyword matching.
 
@@ -49,7 +51,7 @@ refer add path/to/file.txt
 
 Add files recursively from a directory:
 ```bash
-refer add path/to/directory --recursive
+refer add path/to/directory
 ```
 
 Add a web page:
