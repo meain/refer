@@ -126,4 +126,6 @@ refer search "your search query" --limit=10
 
 ---
 
-Inspired by [jkitchin/litdb](https://github.com/jkitchin/litdb).
+Inspired by [inkeep search
+widget](https://inkeep.com/showcase?example=pinecone&tab=aiForCustomers)
+and [jkitchin/litdb](https://github.com/jkitchin/litdb).
