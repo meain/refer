@@ -18,12 +18,13 @@ import (
 )
 
 type CLI struct {
-	Add     Add      `cmd:"" help:"Add a file or directory to the database"`
-	Search  Search   `cmd:"" help:"Search for documents"`
-	Show    Show     `cmd:"" help:"List documents in the database"`
-	Stats   StatsCmd `cmd:"" help:"Show database statistics"`
-	Reindex Reindex  `cmd:"" help:"Reindex all documents"`
-	Remove  Remove   `cmd:"" help:"Remove a document from the database"`
+	Database string   `help:"Database file path" default:".referdb"`
+	Add      Add      `cmd:"" help:"Add a file or directory to the database"`
+	Search   Search   `cmd:"" help:"Search for documents"`
+	Show     Show     `cmd:"" help:"List documents in the database"`
+	Stats    StatsCmd `cmd:"" help:"Show database statistics"`
+	Reindex  Reindex  `cmd:"" help:"Reindex all documents"`
+	Remove   Remove   `cmd:"" help:"Remove a document from the database"`
 }
 
 type Add struct {
@@ -64,7 +65,7 @@ func main() {
 	kctx := kong.Parse(&cli)
 
 	// Initialize database
-	database, err := db.InitDatabase()
+	database, err := db.InitDatabase(cli.Database)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}

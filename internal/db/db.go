@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	DBPath       = ".referdb"
 	EmbeddingDim = 768 // Typical dimension for nomic-embed-text
 )
 
@@ -41,11 +40,11 @@ func GetAllDocuments(db *sql.DB) ([]Document, error) {
 	return docs, nil
 }
 
-func InitDatabase() (*sql.DB, error) {
+func InitDatabase(dbPath string) (*sql.DB, error) {
 	// Ensure sqlite-vec is loaded
 	sqlite_vec.Auto()
 
-	db, err := sql.Open("sqlite3", DBPath)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
 	}
