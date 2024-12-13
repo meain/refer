@@ -93,6 +93,11 @@ Search files (returns file names and similarity scores):
 refer search "your search query"
 ```
 
+Use a different database file:
+```bash
+refer --database=/path/to/db.sqlite search "query"
+```
+
 Get full content matches:
 ```bash
 refer search "your search query" --format=llm
