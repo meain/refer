@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -132,6 +133,16 @@ func main() {
 			}
 		}
 	case "search <query>":
+		// Check if query is empty and read from stdin if so
+		if cli.Search.Query == "" {
+			fmt.Print("Enter search query: ")
+			input, err := ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				log.Fatalf("Failed to read from stdin: %v", err)
+			}
+			cli.Search.Query = string(input)
+		}
+
 		// Generate embedding for search query
 		queryEmbedding, err := embedding.CreateEmbedding(ctx, cli.Search.Query)
 		if err != nil {
