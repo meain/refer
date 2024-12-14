@@ -67,12 +67,6 @@ func main() {
 	var cli CLI
 	kctx := kong.Parse(&cli)
 
-	// Test embedding model as well as get the embedding size
-	sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
-	if err != nil {
-		log.Fatalf("Failed to create embedding: %v", err)
-	}
-
 	// Setup database
 	database, new, err := db.CreateDB(cli.Database)
 	if err != nil {
@@ -82,9 +76,25 @@ func main() {
 	defer database.Close()
 
 	if new {
+		// Test embedding model as well as get the embedding size
+		sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
+		if err != nil {
+			log.Fatalf("Failed to create embedding: %v", err)
+		}
+
 		err = db.InitDatabase(database, len(sampleEmbedding))
 		if err != nil {
 			log.Fatalf("Failed to initialize database: %v", err)
+		}
+
+		err = db.SaveConfig(
+			database,
+			map[string]string{
+				"embedding_model": embedding.Model,
+				"embedding_size":  fmt.Sprintf("%d", len(sampleEmbedding)),
+			})
+		if err != nil {
+			log.Fatalf("Failed to save config: %v", err)
 		}
 	}
 
@@ -214,15 +224,6 @@ func main() {
 	default:
 		panic("Unexpected command: " + kctx.Command())
 	}
-
-	// The assumption is that we have already checked that the model
-	// matches and now we are just updating the config, with the same
-	// model in case it did not change
-	err = db.SaveConfig(database, map[string]string{"embedding_model": embedding.Model})
-	if err != nil {
-		log.Fatalf("Failed to save config: %v", err)
-	}
-
 }
 
 func formatBytes(bytes int) string {
