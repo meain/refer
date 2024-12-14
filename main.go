@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/meain/refer/internal/config"
@@ -65,12 +66,44 @@ func main() {
 	var cli CLI
 	kctx := kong.Parse(&cli)
 
-	// Initialize database
-	database, err := db.InitDatabase(cli.Database)
+	// Setup database
+	database, new, err := db.CreateDB(cli.Database)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		log.Fatalf("Failed to create database: %v", err)
 	}
+
 	defer database.Close()
+
+	if new {
+		err = db.InitDatabase(database)
+		if err != nil {
+			log.Fatalf("Failed to initialize database: %v", err)
+		}
+	}
+
+	if !new {
+		if kctx.Command() == "add <file-path>" || kctx.Command() == "search <query>" {
+			// Check that the embedding model in the database matches the
+			// one in the config only if the command is add or
+			// search. This is necessary as the models must match for the
+			// results to be usable.
+			config, err := db.GetConfig(database)
+			if err != nil {
+				log.Fatalf("Failed to get config: %v", err)
+			}
+
+			if config["embedding_model"] != cfg.EmbeddingModel {
+				fmt.Fprintf(
+					os.Stderr,
+					"Database embedding model does not match config: %s != %s\n"+
+						"Please reindex the documents or update the model\n",
+					config["embedding_model"],
+					cfg.EmbeddingModel)
+
+				os.Exit(1)
+			}
+		}
+	}
 
 	// Handle commands
 	switch kctx.Command() {
@@ -161,6 +194,15 @@ func main() {
 	default:
 		panic("Unexpected command: " + kctx.Command())
 	}
+
+	// The assumption is that we have already checked that the model
+	// matches and now we are just updating the config, with the same
+	// model in case it did not change
+	err = db.SaveConfig(database, map[string]string{"embedding_model": embedding.Model})
+	if err != nil {
+		log.Fatalf("Failed to save config: %v", err)
+	}
+
 }
 
 func formatBytes(bytes int) string {

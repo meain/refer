@@ -3,12 +3,9 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"os"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
-)
-
-const (
-	EmbeddingDim = 768 // Typical dimension for nomic-embed-text
 )
 
 // Document represents a stored document
@@ -40,29 +37,81 @@ func GetAllDocuments(db *sql.DB) ([]Document, error) {
 	return docs, nil
 }
 
-func InitDatabase(dbPath string) (*sql.DB, error) {
+func CreateDB(dbPath string) (*sql.DB, bool, error) {
 	// Ensure sqlite-vec is loaded
 	sqlite_vec.Auto()
 
+	_, ferr := os.Stat(dbPath) // check if already exists
+
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, false, fmt.Errorf("failed to open database: %v", err)
 	}
 
+	return db, os.IsNotExist(ferr), nil
+}
+
+// SaveConfig saves the configuration into a database, we just have to
+// store the embedding model to make sure that we will be using the same
+// model for the search
+func SaveConfig(db *sql.DB, config map[string]string) error {
+	// Ensure sqlite-vec is loaded
+	sqlite_vec.Auto()
+
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS config (key TEXT, value TEXT)")
+	if err != nil {
+		return fmt.Errorf("failed to create config table: %v", err)
+	}
+
+	for key, value := range config {
+		_, err := db.Exec("INSERT INTO config (key, value) VALUES (?, ?)", key, value)
+		if err != nil {
+			return fmt.Errorf("failed to insert config value: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func GetConfig(db *sql.DB) (map[string]string, error) {
+	rows, err := db.Query("SELECT key, value FROM config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query config: %v", err)
+	}
+	defer rows.Close()
+
+	config := make(map[string]string)
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, fmt.Errorf("failed to scan config: %v", err)
+		}
+		config[key] = value
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating config: %v", err)
+	}
+
+	return config, nil
+}
+
+func InitDatabase(db *sql.DB) error {
 	// Create virtual table for vector embeddings
-	_, err = db.Exec(fmt.Sprintf(`
+	_, err := db.Exec(fmt.Sprintf(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS documents USING vec0(
 			rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 			filepath TEXT,
 			content TEXT,
-			embedding float[%d]
+			embedding float[2000]
 		)
-	`, EmbeddingDim))
+	`))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vec table: %v", err)
+		return fmt.Errorf("failed to create vec table: %v", err)
 	}
 
-	return db, nil
+	return nil
 }
 
 func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format string) error {
@@ -74,16 +123,16 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 
 	// Perform vector similarity search
 	rows, err := db.Query(`
-        SELECT 
-            rowid, 
-            filepath, 
-            content,
-            distance 
-        FROM documents 
-        WHERE embedding match ?
-        ORDER BY distance 
-        LIMIT ?
-    `, serializedQuery, limit)
+		SELECT
+			rowid,
+			filepath,
+			content,
+			distance
+		FROM documents
+		WHERE embedding match ?
+		ORDER BY distance
+		LIMIT ?
+	`, serializedQuery, limit)
 	if err != nil {
 		return fmt.Errorf("search query failed: %v", err)
 	}
@@ -154,7 +203,7 @@ func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
 	var doc Document
 	err := db.QueryRow(`
 		SELECT rowid, filepath, content
-		FROM documents 
+		FROM documents
 		WHERE rowid = ?`, id).Scan(&doc.ID, &doc.Path, &doc.Content)
 	if err == sql.ErrNoRows {
 		return nil, nil
