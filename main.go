@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -34,7 +34,7 @@ type Add struct {
 }
 
 type Search struct {
-	Query  string `kong:"arg,required"`
+	Query  string `arg:"" optional:""`
 	Format string `kong:"default='names'"`
 	Limit  int    `kong:"default=5"`
 }
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	if !new {
-		if kctx.Command() == "add <file-path>" || kctx.Command() == "search <query>" {
+		if kctx.Command() == "add <file-path>" || kctx.Command() == "search" {
 			// Check that the embedding model in the database matches the
 			// one in the config only if the command is add or
 			// search. This is necessary as the models must match for the
@@ -132,17 +132,20 @@ func main() {
 				}
 			}
 		}
-	case "search <query>":
-		// Check if query is empty and read from stdin if so
-		if cli.Search.Query == "" {
-			fmt.Print("Enter search query: ")
-			input, err := ioutil.ReadAll(os.Stdin)
-			if err != nil {
-				log.Fatalf("Failed to read from stdin: %v", err)
-			}
-			cli.Search.Query = string(input)
+	case "search":
+		input, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatalf("Failed to read from stdin: %v", err)
 		}
 
+		if len(input) == 0 {
+			log.Fatalf("No input provided")
+		}
+
+		cli.Search.Query = string(input)
+
+		fallthrough
+	case "search <query>":
 		// Generate embedding for search query
 		queryEmbedding, err := embedding.CreateEmbedding(ctx, cli.Search.Query)
 		if err != nil {

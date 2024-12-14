@@ -97,9 +97,15 @@ refer stats
 
 ### Searching
 
-Search files (returns file names and similarity scores):
+Search on input (returns file names and similarity scores):
 ```bash
 refer search "your search query"
+```
+
+Search based on stdin
+```bash
+cat file-name | refer search
+echo "output from other command" | refer search
 ```
 
 Use a different database file:
