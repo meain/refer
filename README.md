@@ -38,6 +38,8 @@ _View the video on [Youtube](https://youtu.be/K5LfqEMUwL0) if you are having tro
 
 If no config file is present, these default values will be used.
 
+You can also use any provider that supports the OpenAI format for embedding API.
+
 ## Installation
 
 ```bash
