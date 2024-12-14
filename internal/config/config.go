@@ -25,22 +25,30 @@ func LoadConfig() (*Config, error) {
 		return cfg, nil // Return defaults if can't get config dir
 	}
 
-	configPath := filepath.Join(configDir, "refer", "config.json")
-
-	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return cfg, nil // Return defaults if no config file
+	// Define possible config paths
+	configPaths := []string{
+		filepath.Join(configDir, "refer", "config.json"),
+		filepath.Join(os.Getenv("HOME"), ".config", "refer", "config.json"), // Additional path for macOS
 	}
 
-	// Read config file
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return cfg, nil // Return defaults if can't read file
-	}
+	for _, configPath := range configPaths {
+		// Check if config file exists
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			continue // Try next path if this file doesn't exist
+		}
 
-	// Parse config
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return cfg, nil // Return defaults if can't parse
+		// Read config file
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return cfg, nil // Return defaults if can't read file
+		}
+
+		// Parse config
+		if err := json.Unmarshal(data, cfg); err != nil {
+			return cfg, nil // Return defaults if can't parse
+		}
+
+		break // Configuration loaded successfully
 	}
 
 	return cfg, nil
