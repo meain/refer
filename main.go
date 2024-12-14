@@ -59,6 +59,7 @@ func main() {
 	}
 	embedding.BaseURL = cfg.EmbeddingBaseURL
 	embedding.Model = cfg.EmbeddingModel
+	embedding.APIKey = cfg.APIKey
 
 	// Parse command-line arguments
 	var cli CLI

@@ -12,6 +12,7 @@ import (
 var (
 	BaseURL = "http://localhost:11434/api/embeddings"
 	Model   = "nomic-embed-text"
+	APIKey  = ""
 )
 
 type EmbeddingRequest struct {
@@ -40,10 +41,11 @@ func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	// Set the content type to JSON
 	req.Header.Set("Content-Type", "application/json")
 
-	// Get the authorization token from the environment variable
 	authToken := os.Getenv("REFER_API_KEY")
-	if authToken != "" {
+	if len(authToken) > 0 {
 		req.Header.Set("Authorization", "Bearer "+authToken)
+	} else if len(APIKey) > 0 {
+		req.Header.Set("Authorization", "Bearer "+APIKey)
 	}
 
 	// Send the request

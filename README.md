@@ -26,16 +26,18 @@ The following settings are available:
 {
     "embedding_base_url": "http://localhost:11434/api/embeddings",
     "embedding_model": "nomic-embed-text",
-    "api_key": "your_api_key_here" // Optional API key
+    "api_key": "" // Optional API key
 }
 ```
 
 - `embedding_base_url`: The URL of embedding API endpoint
 - `embedding_model`: The embedding model to use
-- `api_key`: Optional API key for authorization. It is recommended to pass this via the `REFER_API_KEY` environment variable for better security.
+- `api_key`: Optional API key for authorization. **It is recommended to pass this via the `REFER_API_KEY` environment variable for better security.**
 
 If no config file is present, these default values will be used.
 You can also use any provider that supports the OpenAI format for embedding API.
+
+_If both `REFER_API_KEY` environment variable and `api_key` config value is set, the env variable takes precedence._
 
 ## Authorization
 
