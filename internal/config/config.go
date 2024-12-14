@@ -9,6 +9,7 @@ import (
 type Config struct {
 	EmbeddingBaseURL string `json:"embedding_base_url"`
 	EmbeddingModel   string `json:"embedding_model"`
+	APIKey           string `json:"api_key,omitempty"` // Added API key field
 }
 
 func LoadConfig() (*Config, error) {
