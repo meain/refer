@@ -180,7 +180,7 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 		}
 
 		for _, item := range llmQuery {
-			fmt.Printf("Filepath: %s\n", item.Filepath)
+			fmt.Printf("File: %s\n", item.Filepath)
 			fmt.Printf("Contents: \n%s\n", item.Contents)
 			fmt.Println("------------------------------------------------------")
 		}
