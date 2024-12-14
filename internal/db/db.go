@@ -97,16 +97,16 @@ func GetConfig(db *sql.DB) (map[string]string, error) {
 	return config, nil
 }
 
-func InitDatabase(db *sql.DB) error {
+func InitDatabase(db *sql.DB, embeddingSize int) error {
 	// Create virtual table for vector embeddings
 	_, err := db.Exec(fmt.Sprintf(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS documents USING vec0(
 			rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 			filepath TEXT,
 			content TEXT,
-			embedding float[2000]
+			embedding float[%d]
 		)
-	`))
+	`, embeddingSize))
 	if err != nil {
 		return fmt.Errorf("failed to create vec table: %v", err)
 	}

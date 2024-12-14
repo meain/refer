@@ -67,6 +67,12 @@ func main() {
 	var cli CLI
 	kctx := kong.Parse(&cli)
 
+	// Test embedding model as well as get the embedding size
+	sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
+	if err != nil {
+		log.Fatalf("Failed to create embedding: %v", err)
+	}
+
 	// Setup database
 	database, new, err := db.CreateDB(cli.Database)
 	if err != nil {
@@ -76,7 +82,7 @@ func main() {
 	defer database.Close()
 
 	if new {
-		err = db.InitDatabase(database)
+		err = db.InitDatabase(database, len(sampleEmbedding))
 		if err != nil {
 			log.Fatalf("Failed to initialize database: %v", err)
 		}
