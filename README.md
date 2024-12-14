@@ -35,6 +35,10 @@ The following settings are available:
 If no config file is present, these default values will be used.
 You can also use any provider that supports the OpenAI format for embedding API.
 
+## Authorization
+
+You can optionally set the `REFER_API_KEY` environment variable to provide an authorization token for the API. This token will be included in the request header as `Authorization: Bearer $REFER_API_KEY`. If you are using Ollama, you can keep this variable empty.
+
 ## Installation
 
 ```bash

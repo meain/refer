@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 )
 
 var (
@@ -38,6 +39,12 @@ func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 
 	// Set the content type to JSON
 	req.Header.Set("Content-Type", "application/json")
+
+	// Get the authorization token from the environment variable
+	authToken := os.Getenv("REFER_API_KEY")
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
 
 	// Send the request
 	resp, err := http.DefaultClient.Do(req)
