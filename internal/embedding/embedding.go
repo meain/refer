@@ -9,20 +9,20 @@ import (
 )
 
 var (
-	BaseURL = "http://localhost:11434/api/embeddings" // Default value
-	Model   = "nomic-embed-text"                      // Default value
+	BaseURL = "http://localhost:11434/api/embeddings"
+	Model   = "nomic-embed-text"
 )
 
 type EmbeddingRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
+	Model string `json:"model"`
+	Input string `json:"prompt"`
 }
 
 func CreateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	// Create a new HTTP request
 	data := EmbeddingRequest{
-		Model:  Model,
-		Prompt: text,
+		Model: Model,
+		Input: text,
 	}
 
 	// Marshal the data to JSON

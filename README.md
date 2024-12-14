@@ -10,21 +10,17 @@ _View the video on [Youtube](https://youtu.be/K5LfqEMUwL0) if you are having tro
 
 ## Features
 
-- Semantic search using text embeddings (powered by Ollama's nomic-embed-text model)
+- Semantic search using text embeddings
 - Support for recursive directory scanning
 - Support for indexing web pages
 - Multiple output formats (file names or full content)
 - SQLite-based vector storage for fast similarity search
 - Document management (add, remove, reindex)
 
-## Prerequisites
-
-- Go 1.23 or later
-- [Ollama](https://ollama.ai) running locally with the `nomic-embed-text` model
-
 ## Configuration
 
-`refer` can be configured via a JSON file located at `~/.config/refer/config.json`. The following settings are available:
+`refer` can be configured via a JSON file located at `~/.config/refer/config.json`.
+The following settings are available:
 
 ```json
 {
@@ -33,11 +29,10 @@ _View the video on [Youtube](https://youtu.be/K5LfqEMUwL0) if you are having tro
 }
 ```
 
-- `embedding_base_url`: The URL of your Ollama API endpoint
+- `embedding_base_url`: The URL of embedding API endpoint
 - `embedding_model`: The embedding model to use
 
 If no config file is present, these default values will be used.
-
 You can also use any provider that supports the OpenAI format for embedding API.
 
 ## Installation
