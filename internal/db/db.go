@@ -13,11 +13,12 @@ type Document struct {
 	ID      int64
 	Path    string
 	Content string
+	Title   string
 }
 
 // GetAllDocuments retrieves all documents from the database
 func GetAllDocuments(db *sql.DB) ([]Document, error) {
-	rows, err := db.Query("SELECT rowid, filepath FROM documents")
+	rows, err := db.Query("SELECT rowid, filepath, content, title FROM documents")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query documents: %v", err)
 	}
@@ -26,7 +27,7 @@ func GetAllDocuments(db *sql.DB) ([]Document, error) {
 	var docs []Document
 	for rows.Next() {
 		var doc Document
-		if err := rows.Scan(&doc.ID, &doc.Path); err != nil {
+		if err := rows.Scan(&doc.ID, &doc.Path, &doc.Content, &doc.Title); err != nil {
 			return nil, fmt.Errorf("failed to scan document: %v", err)
 		}
 		docs = append(docs, doc)
@@ -104,6 +105,7 @@ func InitDatabase(db *sql.DB, embeddingSize int) error {
 			rowid INTEGER PRIMARY KEY AUTOINCREMENT,
 			filepath TEXT,
 			content TEXT,
+			title TEXT,
 			embedding float[%d]
 		)
 	`, embeddingSize))
@@ -127,6 +129,7 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 			rowid,
 			filepath,
 			content,
+			title,
 			distance
 		FROM documents
 		WHERE embedding match ?
@@ -145,9 +148,10 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 			var rowid int
 			var filepath string
 			var content string
+			var title string
 			var distance float64
 
-			if err := rows.Scan(&rowid, &filepath, &content, &distance); err != nil {
+			if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
 				return fmt.Errorf("failed to scan row: %v", err)
 			}
 
@@ -157,30 +161,35 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 	} else if format == "llm" {
 		var llmQuery []struct {
 			Filepath string
+			Title    string
 			Contents string
 		}
 		for rows.Next() {
 			var rowid int
 			var filepath string
 			var content string
+			var title string
 			var distance float64
 
-			if err := rows.Scan(&rowid, &filepath, &content, &distance); err != nil {
+			if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
 				return fmt.Errorf("failed to scan row: %v", err)
 			}
 
 			count++
 			llmQuery = append(llmQuery, struct {
 				Filepath string
+				Title    string
 				Contents string
 			}{
 				Filepath: filepath,
+				Title:    title,
 				Contents: content,
 			})
 		}
 
 		for _, item := range llmQuery {
 			fmt.Printf("File: %s\n", item.Filepath)
+			fmt.Printf("Title: %s\n", item.Title)
 			fmt.Printf("Contents: \n%s\n", item.Contents)
 			fmt.Println("------------------------------------------------------")
 		}
@@ -202,9 +211,9 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
 	var doc Document
 	err := db.QueryRow(`
-		SELECT rowid, filepath, content
+		SELECT rowid, filepath, content, title
 		FROM documents
-		WHERE rowid = ?`, id).Scan(&doc.ID, &doc.Path, &doc.Content)
+		WHERE rowid = ?`, id).Scan(&doc.ID, &doc.Path, &doc.Content, &doc.Title)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

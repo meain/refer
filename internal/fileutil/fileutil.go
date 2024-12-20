@@ -45,15 +45,23 @@ func isPrintable(b byte) bool {
 
 func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 	var content string
+	var title string
 	var err error
 
 	// TODO: Check if the document(file/url) exists in DB, if it does, check if
 	// the contents match and only reindex if they are not the same.
 	// Check if path is a URL
 	if webutil.IsURL(path) {
-		content, err = webutil.FetchURL(path)
+		if webutil.IsYouTubeURL(path) {
+			content, title, err = webutil.FetchYouTubeContent(path)
+		} else {
+			content, title, err = webutil.FetchWebContent(path)
+		}
 		if err != nil {
 			return fmt.Errorf("failed to fetch URL %q: %v", path, err)
+		}
+		if title == "" {
+			title = path
 		}
 	} else {
 		// Handle regular file
@@ -74,6 +82,7 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 			return fmt.Errorf("failed to read file: %v", err)
 		}
 		content = string(contentBytes)
+		title = path
 	}
 
 	// Generate embedding
@@ -103,8 +112,8 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 
 	// Insert document with vector embedding
 	_, err = db.Exec(
-		"INSERT INTO documents(filepath, content, embedding) VALUES (?, ?, ?)",
-		path, content, serializedEmbedding)
+		"INSERT INTO documents(filepath, content, title, embedding) VALUES (?, ?, ?, ?)",
+		path, content, title, serializedEmbedding)
 	if err != nil {
 		return fmt.Errorf("failed to insert document: %v", err)
 	}
