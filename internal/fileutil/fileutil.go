@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/meain/refer/internal/embedding"
 	"github.com/meain/refer/internal/webutil"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
+
+const maxParallelEmbeddingRequests = 10
 
 func IsTextFile(filePath string) bool {
 	// Try to read the first 512 bytes of the file
@@ -117,4 +120,51 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 
 	fmt.Printf("Document added: %s\n", path)
 	return nil
+}
+
+// AddDocuments processes multiple documents in parallel with a maximum number of concurrent operations
+func AddDocuments(ctx context.Context, db *sql.DB, paths []string) []error {
+	// Create a channel for paths and errors
+	pathChan := make(chan string, len(paths))
+	errChan := make(chan error, len(paths))
+
+	// Create a wait group to track workers
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < maxParallelEmbeddingRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range pathChan {
+				if err := AddDocument(ctx, db, path); err != nil {
+					errChan <- fmt.Errorf("error processing %q: %v", path, err)
+				} else {
+					errChan <- nil
+				}
+			}
+		}()
+	}
+
+	// Send paths to workers
+	for _, path := range paths {
+		pathChan <- path
+	}
+	close(pathChan)
+
+	// Wait for all workers to finish
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	// Collect errors
+	var errors []error
+	for err := range errChan {
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+
+	return errors
 }

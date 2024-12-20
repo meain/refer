@@ -52,7 +52,6 @@ func GetAllFilePaths(db *sql.DB) ([]string, error) {
 			return nil, fmt.Errorf("failed to scan filepath: %v", err)
 		}
 
-		fmt.Println(filepath)
 		filepaths = append(filepaths, filepath)
 	}
 	if err := rows.Err(); err != nil {

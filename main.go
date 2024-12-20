@@ -125,11 +125,10 @@ func main() {
 	// Handle commands
 	switch kctx.Command() {
 	case "add <file-path>":
+		var allPaths []string
 		for _, f := range cli.Add.FilePath {
 			if webutil.IsURL(f) {
-				if err := fileutil.AddDocument(ctx, database, f); err != nil {
-					log.Printf("Failed to add document %q: %v", f, err)
-				}
+				allPaths = append(allPaths, f)
 			} else {
 				err = filepath.WalkDir(f, func(path string, dirEntry fs.DirEntry, err error) error {
 					if err != nil {
@@ -137,15 +136,20 @@ func main() {
 						return err
 					}
 					if !dirEntry.IsDir() {
-						if err := fileutil.AddDocument(ctx, database, path); err != nil {
-							log.Printf("Failed to add document %q: %v", path, err)
-						}
+						allPaths = append(allPaths, path)
 					}
 					return nil
 				})
 				if err != nil {
 					log.Printf("Failed to walk directory %q: %v", f, err)
 				}
+			}
+		}
+
+		// Process documents in parallel
+		if errors := fileutil.AddDocuments(ctx, database, allPaths, 5); len(errors) > 0 {
+			for _, err := range errors {
+				log.Printf("Error: %v", err)
 			}
 		}
 	case "search":
@@ -195,9 +199,10 @@ func main() {
 			log.Fatalf("Failed to save config: %v", err)
 		}
 
-		for _, doc := range docs {
-			if err := fileutil.AddDocument(ctx, database, doc); err != nil {
-				log.Printf("Failed to reindex document %q: %v", doc, err)
+		// Process documents in parallel
+		if errors := fileutil.AddDocuments(ctx, database, docs, 5); len(errors) > 0 {
+			for _, err := range errors {
+				log.Printf("Error during reindex: %v", err)
 			}
 		}
 
