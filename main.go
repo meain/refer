@@ -9,14 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/meain/refer/internal/config"
-	"github.com/meain/refer/internal/db"
-	"github.com/meain/refer/internal/embedding"
-	"github.com/meain/refer/internal/fileutil"
-	"github.com/meain/refer/internal/webutil"
-
 	"github.com/alecthomas/kong"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/meain/refer/internal"
 )
 
 type CLI struct {
@@ -55,20 +50,17 @@ func main() {
 	ctx := context.Background()
 
 	// Load config
-	cfg, err := config.LoadConfig()
+	cfg, err := internal.LoadConfig()
 	if err != nil {
 		log.Printf("Warning: using default config: %v", err)
 	}
-	embedding.BaseURL = cfg.EmbeddingBaseURL
-	embedding.Model = cfg.EmbeddingModel
-	embedding.APIKey = cfg.APIKey
 
 	// Parse command-line arguments
 	var cli CLI
 	kctx := kong.Parse(&cli)
 
 	// Setup database
-	database, new, err := db.CreateDB(cli.Database)
+	database, new, err := internal.CreateDB(cli.Database)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}
@@ -77,20 +69,20 @@ func main() {
 
 	if new {
 		// Test embedding model as well as get the embedding size
-		sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
+		sampleEmbedding, err := internal.CreateEmbedding(ctx, "refer")
 		if err != nil {
 			log.Fatalf("Failed to create embedding: %v", err)
 		}
 
-		err = db.InitDatabase(database, len(sampleEmbedding))
+		err = internal.InitDatabase(database, len(sampleEmbedding))
 		if err != nil {
 			log.Fatalf("Failed to initialize database: %v", err)
 		}
 
-		err = db.SaveConfig(
+		err = internal.SaveConfig(
 			database,
 			map[string]string{
-				"embedding_model": embedding.Model,
+				"embedding_model": internal.Model,
 				"embedding_size":  fmt.Sprintf("%d", len(sampleEmbedding)),
 			})
 		if err != nil {
@@ -104,7 +96,7 @@ func main() {
 			// one in the config only if the command is add or
 			// search. This is necessary as the models must match for the
 			// results to be usable.
-			config, err := db.GetConfig(database)
+			config, err := internal.GetConfig(database)
 			if err != nil {
 				log.Fatalf("Failed to get config: %v", err)
 			}
@@ -127,7 +119,7 @@ func main() {
 	case "add <file-path>":
 		var allPaths []string
 		for _, f := range cli.Add.FilePath {
-			if webutil.IsURL(f) {
+			if internal.IsRemoteURL(f) {
 				allPaths = append(allPaths, f)
 			} else {
 				err = filepath.WalkDir(f, func(path string, dirEntry fs.DirEntry, err error) error {
@@ -147,7 +139,7 @@ func main() {
 		}
 
 		// Process documents in parallel
-		if errors := fileutil.AddDocuments(ctx, database, allPaths, 5); len(errors) > 0 {
+		if errors := internal.AddDocuments(ctx, database, allPaths, 5); len(errors) > 0 {
 			for _, err := range errors {
 				log.Printf("Error: %v", err)
 			}
@@ -167,32 +159,32 @@ func main() {
 		fallthrough
 	case "search <query>":
 		// Generate embedding for search query
-		queryEmbedding, err := embedding.CreateEmbedding(ctx, cli.Search.Query)
+		queryEmbedding, err := internal.CreateEmbedding(ctx, cli.Search.Query)
 		if err != nil {
 			log.Fatalf("Failed to create query embedding: %v", err)
 		}
 
 		// Perform search
-		if err := db.SearchDocuments(database, queryEmbedding, cli.Search.Limit, cli.Search.Format); err != nil {
+		if err := internal.SearchDocuments(database, queryEmbedding, cli.Search.Limit, cli.Search.Format); err != nil {
 			log.Fatalf("Search failed: %v", err)
 		}
 	case "reindex":
-		sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
+		sampleEmbedding, err := internal.CreateEmbedding(ctx, "refer")
 		if err != nil {
 			log.Fatalf("Failed to create embedding: %v", err)
 		}
 
 		embeddingSize := len(sampleEmbedding)
 
-		docs, err := db.RecreateDatabase(database, embeddingSize)
+		docs, err := internal.RecreateDatabase(database, embeddingSize)
 		if err != nil {
 			log.Fatalf("Failed to reindex database: %v", err)
 		}
 
-		err = db.SaveConfig(
+		err = internal.SaveConfig(
 			database,
 			map[string]string{
-				"embedding_model": embedding.Model,
+				"embedding_model": internal.Model,
 				"embedding_size":  fmt.Sprintf("%d", embeddingSize),
 			})
 		if err != nil {
@@ -200,7 +192,7 @@ func main() {
 		}
 
 		// Process documents in parallel
-		if errors := fileutil.AddDocuments(ctx, database, docs, 5); len(errors) > 0 {
+		if errors := internal.AddDocuments(ctx, database, docs, 5); len(errors) > 0 {
 			for _, err := range errors {
 				log.Printf("Error during reindex: %v", err)
 			}
@@ -209,7 +201,7 @@ func main() {
 		fmt.Printf("Successfully reindexed %d documents\n", len(docs))
 	case "show":
 		// List all documents
-		docs, err := db.GetAllDocuments(database)
+		docs, err := internal.GetAllDocuments(database)
 		if err != nil {
 			log.Fatalf("Failed to get documents: %v", err)
 		}
@@ -222,7 +214,7 @@ func main() {
 		}
 	case "show <id>":
 		// Show specific document
-		doc, err := db.GetDocumentByID(database, *cli.Show.ID)
+		doc, err := internal.GetDocumentByID(database, *cli.Show.ID)
 		if err != nil {
 			log.Fatalf("Failed to get document with ID %d: %v", *cli.Show.ID, err)
 		}
@@ -231,7 +223,7 @@ func main() {
 		}
 		fmt.Printf("%s\n%s\n", doc.Path, doc.Content)
 	case "stats":
-		stats, err := db.GetDatabaseStats(database)
+		stats, err := internal.GetDatabaseStats(database)
 		if err != nil {
 			log.Fatalf("Failed to get database stats: %v", err)
 		}
@@ -239,7 +231,7 @@ func main() {
 		fmt.Printf("Documents: %d\n", stats["documents"])
 		fmt.Printf("Total Content Size: %s\n", formatBytes(stats["total_content_bytes"]))
 	case "remove <id>":
-		if err := db.RemoveDocument(database, cli.Remove.ID); err != nil {
+		if err := internal.RemoveDocument(database, cli.Remove.ID); err != nil {
 			log.Fatalf("Failed to remove document: %v", err)
 		}
 		fmt.Printf("Document %d removed successfully\n", cli.Remove.ID)

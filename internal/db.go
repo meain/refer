@@ -1,4 +1,4 @@
-package db
+package internal
 
 import (
 	"database/sql"
@@ -10,10 +10,11 @@ import (
 
 // Document represents a stored document
 type Document struct {
-	ID      int64
-	Path    string
-	Content string
-	Title   string
+	ID       int64
+	Path     string
+	Content  string
+	Title    string
+	IsRemote bool
 }
 
 // GetAllDocuments retrieves all documents from the database
@@ -61,37 +62,75 @@ func GetAllFilePaths(db *sql.DB) ([]string, error) {
 	return filepaths, nil
 }
 
+// CreateDB creates or opens a SQLite database at the given path.
+// Returns the database connection, a boolean indicating if it's a new database,
+// and any error that occurred.
 func CreateDB(dbPath string) (*sql.DB, bool, error) {
-	// Ensure sqlite-vec is loaded
-	sqlite_vec.Auto()
+	sqlite_vec.Auto() // Ensure sqlite-vec is loaded
 
-	_, ferr := os.Stat(dbPath) // check if already exists
-
+	isNew := !fileExists(dbPath)
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to open database: %v", err)
+		return nil, false, fmt.Errorf("open database %s: %w", dbPath, err)
 	}
 
-	return db, os.IsNotExist(ferr), nil
+	return db, isNew, nil
 }
 
-// SaveConfig saves the configuration into a database, we just have to
-// store the embedding model to make sure that we will be using the same
-// model for the search
-func SaveConfig(db *sql.DB, config map[string]string) error {
-	// Ensure sqlite-vec is loaded
-	sqlite_vec.Auto()
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
 
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS config (key TEXT, value TEXT)")
-	if err != nil {
-		return fmt.Errorf("failed to create config table: %v", err)
+// InitDatabase initializes the database schema with the required tables
+func InitDatabase(db *sql.DB, embeddingSize int) error {
+	query := fmt.Sprintf(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS documents USING vec0(
+			rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+			filepath TEXT UNIQUE,
+			content TEXT,
+			title TEXT,
+			embedding float[%d]
+		)
+	`, embeddingSize)
+
+	if _, err := db.Exec(query); err != nil {
+		return fmt.Errorf("create documents table: %w", err)
 	}
 
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS config (
+			key TEXT PRIMARY KEY,
+			value TEXT
+		)`); err != nil {
+		return fmt.Errorf("create config table: %w", err)
+	}
+
+	return nil
+}
+
+// SaveConfig saves configuration key-value pairs to the database
+func SaveConfig(db *sql.DB, config map[string]string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)")
+	if err != nil {
+		return fmt.Errorf("prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
 	for key, value := range config {
-		_, err := db.Exec("INSERT INTO config (key, value) VALUES (?, ?)", key, value)
-		if err != nil {
-			return fmt.Errorf("failed to insert config value: %v", err)
+		if _, err := stmt.Exec(key, value); err != nil {
+			return fmt.Errorf("insert config %s: %w", key, err)
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return nil
@@ -121,33 +160,13 @@ func GetConfig(db *sql.DB) (map[string]string, error) {
 	return config, nil
 }
 
-func InitDatabase(db *sql.DB, embeddingSize int) error {
-	// Create virtual table for vector embeddings
-	_, err := db.Exec(fmt.Sprintf(`
-		CREATE VIRTUAL TABLE IF NOT EXISTS documents USING vec0(
-			rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-			filepath TEXT,
-			content TEXT,
-			title TEXT,
-			embedding float[%d]
-		)
-	`, embeddingSize))
-	if err != nil {
-		return fmt.Errorf("failed to create vec table: %v", err)
-	}
-
-	return nil
-}
-
 func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format string) error {
-	// Serialize the query embedding
 	serializedQuery, err := sqlite_vec.SerializeFloat32(queryEmbedding)
 	if err != nil {
-		return fmt.Errorf("failed to serialize query embedding: %v", err)
+		return fmt.Errorf("serialize query: %w", err)
 	}
 
-	// Perform vector similarity search
-	rows, err := db.Query(`
+	query := `
 		SELECT
 			rowid,
 			filepath,
@@ -158,73 +177,75 @@ func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format str
 		WHERE embedding match ?
 		ORDER BY distance
 		LIMIT ?
-	`, serializedQuery, limit)
+	`
+
+	rows, err := db.Query(query, serializedQuery, limit)
 	if err != nil {
-		return fmt.Errorf("search query failed: %v", err)
+		return fmt.Errorf("execute search: %w", err)
 	}
 	defer rows.Close()
-	var count int
 
-	// Print results
-	if format == "names" {
-		for rows.Next() {
-			var rowid int
-			var filepath string
-			var content string
-			var title string
-			var distance float64
+	switch format {
+	case "names":
+		return printNameResults(rows)
+	case "llm":
+		return printLLMResults(rows)
+	default:
+		return fmt.Errorf("unknown format: %s", format)
+	}
+}
 
-			if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
-				return fmt.Errorf("failed to scan row: %v", err)
-			}
+func printNameResults(rows *sql.Rows) error {
+	for rows.Next() {
+		var rowid int
+		var filepath string
+		var content, title string
+		var distance float64
 
-			count++
-			fmt.Printf("%d: %s (%.4f)\n", rowid, filepath, distance)
+		if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
+			return fmt.Errorf("scan row: %w", err)
 		}
-	} else if format == "llm" {
-		var llmQuery []struct {
+
+		fmt.Printf("%d: %s (%.4f)\n", rowid, filepath, distance)
+	}
+	return rows.Err()
+}
+
+func printLLMResults(rows *sql.Rows) error {
+	var results []struct {
+		Filepath string
+		Title    string
+		Contents string
+	}
+
+	for rows.Next() {
+		var rowid int
+		var filepath string
+		var content, title string
+		var distance float64
+
+		if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
+			return fmt.Errorf("scan row: %w", err)
+		}
+
+		results = append(results, struct {
 			Filepath string
 			Title    string
 			Contents string
-		}
-		for rows.Next() {
-			var rowid int
-			var filepath string
-			var content string
-			var title string
-			var distance float64
-
-			if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
-				return fmt.Errorf("failed to scan row: %v", err)
-			}
-
-			count++
-			llmQuery = append(llmQuery, struct {
-				Filepath string
-				Title    string
-				Contents string
-			}{
-				Filepath: filepath,
-				Title:    title,
-				Contents: content,
-			})
-		}
-
-		for _, item := range llmQuery {
-			fmt.Printf("File: %s\n", item.Filepath)
-			fmt.Printf("Title: %s\n", item.Title)
-			fmt.Printf("Contents: \n%s\n", item.Contents)
-			fmt.Println("------------------------------------------------------")
-		}
-	} else {
-		return fmt.Errorf("unknown format: %s", format)
+		}{
+			Filepath: filepath,
+			Title:    title,
+			Contents: content,
+		})
 	}
 
-	if rows.Err() != nil {
-		return rows.Err()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate rows: %w", err)
 	}
-	if count == 0 {
-		fmt.Println("No results found.")
+
+	// Print results in LLM format
+	for _, r := range results {
+		fmt.Printf("File: %s\nTitle: %s\n\n%s\n---\n", r.Filepath, r.Title, r.Contents)
 	}
 
 	return nil
