@@ -173,18 +173,35 @@ func main() {
 			log.Fatalf("Search failed: %v", err)
 		}
 	case "reindex":
-		// Get all documents from database
-		docs, err := db.GetAllDocuments(database)
+		sampleEmbedding, err := embedding.CreateEmbedding(ctx, "refer")
 		if err != nil {
-			log.Fatalf("Failed to get documents: %v", err)
+			log.Fatalf("Failed to create embedding: %v", err)
 		}
 
-		// Reindex each document
+		embeddingSize := len(sampleEmbedding)
+
+		docs, err := db.RecreateDatabase(database, embeddingSize)
+		if err != nil {
+			log.Fatalf("Failed to reindex database: %v", err)
+		}
+
+		err = db.SaveConfig(
+			database,
+			map[string]string{
+				"embedding_model": embedding.Model,
+				"embedding_size":  fmt.Sprintf("%d", embeddingSize),
+			})
+		if err != nil {
+			log.Fatalf("Failed to save config: %v", err)
+		}
+
 		for _, doc := range docs {
-			if err := fileutil.AddDocument(ctx, database, doc.Path); err != nil {
-				log.Printf("Failed to reindex document %q: %v", doc.Path, err)
+			if err := fileutil.AddDocument(ctx, database, doc); err != nil {
+				log.Printf("Failed to reindex document %q: %v", doc, err)
 			}
 		}
+
+		fmt.Printf("Successfully reindexed %d documents\n", len(docs))
 	case "show":
 		// List all documents
 		docs, err := db.GetAllDocuments(database)

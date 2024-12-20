@@ -38,6 +38,30 @@ func GetAllDocuments(db *sql.DB) ([]Document, error) {
 	return docs, nil
 }
 
+func GetAllFilePaths(db *sql.DB) ([]string, error) {
+	rows, err := db.Query("SELECT filepath FROM documents")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query filepaths: %v", err)
+	}
+	defer rows.Close()
+
+	var filepaths []string
+	for rows.Next() {
+		var filepath string
+		if err := rows.Scan(&filepath); err != nil {
+			return nil, fmt.Errorf("failed to scan filepath: %v", err)
+		}
+
+		fmt.Println(filepath)
+		filepaths = append(filepaths, filepath)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating filepaths: %v", err)
+	}
+
+	return filepaths, nil
+}
+
 func CreateDB(dbPath string) (*sql.DB, bool, error) {
 	// Ensure sqlite-vec is loaded
 	sqlite_vec.Auto()
@@ -262,4 +286,33 @@ func GetDatabaseStats(db *sql.DB) (map[string]int, error) {
 	stats["total_content_bytes"] = totalSize
 
 	return stats, nil
+}
+
+// RecreateDatabase recreates the database from scratch with the current schema
+func RecreateDatabase(db *sql.DB, embeddingSize int) ([]string, error) {
+	// Get all existing documents before dropping the table
+	docs, err := GetAllFilePaths(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing documents: %v", err)
+	}
+
+	// Drop the existing table
+	_, err = db.Exec("DROP TABLE IF EXISTS documents")
+	if err != nil {
+		return nil, fmt.Errorf("failed to drop existing table: %v", err)
+	}
+
+	// Drop the config table
+	_, err = db.Exec("DROP TABLE IF EXISTS config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to drop config table: %v", err)
+	}
+
+	// Initialize new database with current schema
+	err = InitDatabase(db, embeddingSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize new database: %v", err)
+	}
+
+	return docs, nil
 }
