@@ -213,7 +213,7 @@ func main() {
 			return
 		}
 		for _, doc := range docs {
-			fmt.Printf("[%d] %s\n", doc.ID, doc.Path)
+			fmt.Printf("[%d] %s\n", doc.ID, doc.Title)
 		}
 	case "show <id>":
 		// Show specific document

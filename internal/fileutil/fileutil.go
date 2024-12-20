@@ -52,14 +52,11 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 	// the contents match and only reindex if they are not the same.
 	// Check if path is a URL
 	if webutil.IsURL(path) {
-		if webutil.IsYouTubeURL(path) {
-			content, title, err = webutil.FetchYouTubeContent(path)
-		} else {
-			content, title, err = webutil.FetchWebContent(path)
-		}
+		content, title, err = webutil.FetchWebContent(path)
 		if err != nil {
 			return fmt.Errorf("failed to fetch URL %q: %v", path, err)
 		}
+
 		if title == "" {
 			title = path
 		}
