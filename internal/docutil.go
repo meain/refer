@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/net/html"
+
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 )
@@ -127,13 +129,31 @@ func isPrintable(b byte) bool {
 	return (b >= 32 && b <= 126) || (b >= 192 && b <= 255)
 }
 
-func extractTitle(html string) string {
-	titleStart := strings.Index(html, "<title>")
-	titleEnd := strings.Index(html, "</title>")
-	if titleStart != -1 && titleEnd != -1 {
-		title := html[titleStart+7 : titleEnd]
-		return strings.TrimSpace(title)
+func extractTitle(htmlContent string) string {
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return ""
 	}
+	title := extractTitleFromNode(doc)
+	if title != "" {
+		return title
+	}
+
+	return ""
+}
+
+func extractTitleFromNode(n *html.Node) string {
+	if n.Type == html.ElementNode && n.Data == "title" {
+		return n.FirstChild.Data
+	}
+
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		title := extractTitleFromNode(c)
+		if title != "" {
+			return title
+		}
+	}
+
 	return ""
 }
 
