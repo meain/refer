@@ -7,6 +7,7 @@ import (
     "strings"
     
     "github.com/JohannesKaufmann/html-to-markdown"
+    "github.com/meain/refer/internal/youtube"
 )
 
 // IsURL checks if the given string is a URL
@@ -14,8 +15,18 @@ func IsURL(path string) bool {
     return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://")
 }
 
+// IsYouTubeURL checks if the given URL is a YouTube URL
+func IsYouTubeURL(url string) bool {
+    return strings.Contains(url, "youtube.com/watch") || strings.Contains(url, "youtu.be/")
+}
+
 // FetchURL fetches a webpage and converts it to markdown
 func FetchURL(url string) (string, error) {
+    // Check if it's a YouTube URL
+    if IsYouTubeURL(url) {
+        return youtube.GetCaptions(url)
+    }
+
     // Fetch the webpage
     resp, err := http.Get(url)
     if err != nil {
@@ -46,4 +57,4 @@ func FetchURL(url string) (string, error) {
     markdown = strings.TrimSpace(markdown)
     
     return markdown, nil
-} 
+}
