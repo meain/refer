@@ -25,13 +25,14 @@ type CLI struct {
 }
 
 type Add struct {
-	FilePath []string `kong:"arg,required"`
+	FilePath []string `arg:"" required:"" help:"File, directory or URL to add to the database"`
 }
 
 type Search struct {
-	Query  string `arg:"" optional:""`
-	Format string `kong:"default='names'"`
-	Limit  int    `kong:"default=5"`
+	Query     string   `arg:"" optional:"" help:"Search query to be executed"`
+	Format    string   `default:"names" help:"Format of the search results"`
+	Limit     int      `default:"5" help:"Maximum number of search results to return"`
+	Threshold *float64 `help:"Maximum distance threshold for search results (20 is a good value)"`
 }
 
 type Reindex struct{}
@@ -165,8 +166,22 @@ func main() {
 		}
 
 		// Perform search
-		if err := internal.SearchDocuments(database, queryEmbedding, cli.Search.Limit, cli.Search.Format); err != nil {
+		docs, err := internal.SearchDocuments(
+			database,
+			queryEmbedding,
+			cli.Search.Limit,
+			cli.Search.Threshold)
+		if err != nil {
 			log.Fatalf("Search failed: %v", err)
+		}
+
+		switch cli.Search.Format {
+		case "names":
+			PrintNameResults(docs)
+		case "llm":
+			PrintLLMResults(docs)
+		default:
+			log.Fatalf("Unknown format: %s", cli.Search.Format)
 		}
 	case "reindex":
 		sampleEmbedding, err := internal.CreateEmbedding(ctx, "refer")
@@ -251,4 +266,17 @@ func formatBytes(bytes int) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func PrintNameResults(docs []internal.Document) {
+	for _, doc := range docs {
+		fmt.Printf("%d: %s (%.4f)\n", doc.ID, doc.Path, doc.Distance)
+	}
+}
+
+func PrintLLMResults(docs []internal.Document) {
+	// Print results in LLM format
+	for _, doc := range docs {
+		fmt.Printf("File: %s\nTitle: %s\n\n%s\n---\n", doc.Path, doc.Title, doc.Content)
+	}
 }

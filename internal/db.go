@@ -15,6 +15,9 @@ type Document struct {
 	Content  string
 	Title    string
 	IsRemote bool
+
+	// Only used for search results
+	Distance float64
 }
 
 // GetAllDocuments retrieves all documents from the database
@@ -160,63 +163,42 @@ func GetConfig(db *sql.DB) (map[string]string, error) {
 	return config, nil
 }
 
-func SearchDocuments(db *sql.DB, queryEmbedding []float32, limit int, format string) error {
+func SearchDocuments(
+	db *sql.DB,
+	queryEmbedding []float32,
+	limit int,
+	threshold *float64,
+) ([]Document, error) {
 	serializedQuery, err := sqlite_vec.SerializeFloat32(queryEmbedding)
 	if err != nil {
-		return fmt.Errorf("serialize query: %w", err)
+		return nil, fmt.Errorf("serialize query: %w", err)
 	}
 
-	query := `
-		SELECT
-			rowid,
-			filepath,
-			content,
-			title,
-			distance
-		FROM documents
-		WHERE embedding match ?
-		ORDER BY distance
-		LIMIT ?
-	`
+	baseQuery := `
+	SELECT
+		rowid,
+		filepath,
+		content,
+		title,
+		distance
+	FROM documents
+	WHERE embedding match ?
+	ORDER BY distance LIMIT ?
+`
 
-	rows, err := db.Query(query, serializedQuery, limit)
+	rows, err := db.Query(baseQuery, serializedQuery, limit)
+
 	if err != nil {
-		return fmt.Errorf("execute search: %w", err)
+		return nil, fmt.Errorf("execute search: %w", err)
 	}
+
+	if rows == nil {
+		return nil, fmt.Errorf("no rows returned for query")
+	}
+
 	defer rows.Close()
 
-	switch format {
-	case "names":
-		return printNameResults(rows)
-	case "llm":
-		return printLLMResults(rows)
-	default:
-		return fmt.Errorf("unknown format: %s", format)
-	}
-}
-
-func printNameResults(rows *sql.Rows) error {
-	for rows.Next() {
-		var rowid int
-		var filepath string
-		var content, title string
-		var distance float64
-
-		if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
-			return fmt.Errorf("scan row: %w", err)
-		}
-
-		fmt.Printf("%d: %s (%.4f)\n", rowid, filepath, distance)
-	}
-	return rows.Err()
-}
-
-func printLLMResults(rows *sql.Rows) error {
-	var results []struct {
-		Filepath string
-		Title    string
-		Contents string
-	}
+	documents := make([]Document, 0)
 
 	for rows.Next() {
 		var rowid int
@@ -225,30 +207,28 @@ func printLLMResults(rows *sql.Rows) error {
 		var distance float64
 
 		if err := rows.Scan(&rowid, &filepath, &content, &title, &distance); err != nil {
-			return fmt.Errorf("scan row: %w", err)
+			return nil, fmt.Errorf("scan row: %w", err)
 		}
 
-		results = append(results, struct {
-			Filepath string
-			Title    string
-			Contents string
-		}{
-			Filepath: filepath,
+		// TODO: Get this into the query
+		if distance > *threshold {
+			continue
+		}
+
+		documents = append(documents, Document{
+			ID:       int64(rowid),
+			Path:     filepath,
+			Content:  content,
 			Title:    title,
-			Contents: content,
+			Distance: distance,
 		})
 	}
 
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate rows: %w", err)
+	if rows.Err() != nil {
+		return nil, rows.Err()
 	}
 
-	// Print results in LLM format
-	for _, r := range results {
-		fmt.Printf("File: %s\nTitle: %s\n\n%s\n---\n", r.Filepath, r.Title, r.Contents)
-	}
-
-	return nil
+	return documents, nil
 }
 
 // GetDocumentByID retrieves a single document by its ID

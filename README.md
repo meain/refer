@@ -123,6 +123,12 @@ Limit results:
 refer search "your search query" --limit=10
 ```
 
+Max distance threshold:
+
+``` bash
+refer search "your search query" --threshold=20
+```
+
 ## How it Works
 
 1. When adding files, `refer`:
