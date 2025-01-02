@@ -211,7 +211,7 @@ func SearchDocuments(
 		}
 
 		// TODO: Get this into the query
-		if distance > *threshold {
+		if threshold != nil && distance > *threshold {
 			continue
 		}
 
