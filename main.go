@@ -277,6 +277,10 @@ func PrintNameResults(docs []internal.Document) {
 func PrintLLMResults(docs []internal.Document) {
 	// Print results in LLM format
 	for _, doc := range docs {
-		fmt.Printf("File: %s\nTitle: %s\n\n%s\n---\n", doc.Path, doc.Title, doc.Content)
+		if doc.Title != doc.Path {
+			fmt.Printf("File: %s\nTitle: %s\n\n```\n%s\n```\n---\n", doc.Path, doc.Title, doc.Content)
+		} else {
+			fmt.Printf("File: %s\n\n```\n%s\n```\n---\n", doc.Path, doc.Content)
+		}
 	}
 }
