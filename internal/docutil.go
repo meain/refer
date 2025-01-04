@@ -7,9 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/go-git/go-billy/v5/osfs"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"golang.org/x/net/html"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
@@ -88,6 +92,68 @@ func fetchLocalDocument(path string) (*Document, error) {
 }
 
 // validateLocalFile checks if a local file is valid for processing
+func FindGitDir(startPath string) (string, error) {
+	dir := startPath
+	for {
+		gitPath := filepath.Join(dir, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("no .git directory found")
+}
+
+func LoadGitignorePatterns(gitDir string) ([]gitignore.Pattern, error) {
+	repo, err := git.PlainOpen(gitDir)
+	if err != nil {
+		return nil, fmt.Errorf("open git repository: %w", err)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("get worktree: %w", err)
+	}
+
+	// Add default ignore patterns for .git and .jj folders
+	patterns := wt.Excludes
+	patterns = append(patterns, gitignore.ParsePattern(".git", nil))
+	patterns = append(patterns, gitignore.ParsePattern(".jj", nil))
+
+	// Add global patterns
+	fs := osfs.New("/")
+	globalPatterns, err := gitignore.LoadGlobalPatterns(fs)
+	if err != nil {
+		return nil, fmt.Errorf("load global gitignore patterns: %w", err)
+	}
+
+	patterns = append(patterns, globalPatterns...)
+
+	return patterns, nil
+}
+
+func LoadGitignoreFromFile(path string) ([]gitignore.Pattern, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read gitignore file: %w", err)
+	}
+
+	var patterns []gitignore.Pattern
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			patterns = append(patterns, gitignore.ParsePattern(line, nil))
+		}
+	}
+
+	return patterns, nil
+}
+
 func validateLocalFile(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {

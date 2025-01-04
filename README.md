@@ -63,6 +63,11 @@ Add files recursively from a directory:
 refer add path/to/directory
 ```
 
+Add files while respecting gitignore patterns:
+```bash
+refer add path/to/directory --ignore
+```
+
 Add a web page:
 ```bash
 refer add https://example.com/page.html

@@ -8,8 +8,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kong"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/meain/refer/internal"
 )
@@ -26,6 +28,7 @@ type CLI struct {
 
 type Add struct {
 	FilePath []string `arg:"" required:"" help:"File, directory or URL to add to the database"`
+	Ignore   bool     `help:"Ignore files that are ignored by git"`
 }
 
 type Search struct {
@@ -123,11 +126,40 @@ func main() {
 			if internal.IsRemoteURL(f) {
 				allPaths = append(allPaths, f)
 			} else {
+				var matcher gitignore.Matcher
+				if cli.Add.Ignore {
+					gitDir, err := internal.FindGitDir(f)
+					if err == nil {
+						patterns, err := internal.LoadGitignorePatterns(gitDir)
+						if err != nil {
+							log.Printf("Warning: could not load gitignore patterns: %v", err)
+						} else {
+							matcher = gitignore.NewMatcher(patterns)
+						}
+					}
+				}
+
 				err = filepath.WalkDir(f, func(path string, dirEntry fs.DirEntry, err error) error {
 					if err != nil {
 						log.Printf("Failed to walk directory %q: %v", f, err)
 						return err
 					}
+
+					// Skip if ignored by git
+					if matcher != nil {
+						relPath, err := filepath.Rel(f, path)
+						if err != nil {
+							return err
+						}
+
+						if matcher.Match(strings.Split(relPath, string(filepath.Separator)), dirEntry.IsDir()) {
+							if dirEntry.IsDir() {
+								return filepath.SkipDir
+							}
+							return nil
+						}
+					}
+
 					if !dirEntry.IsDir() {
 						allPaths = append(allPaths, path)
 					}
