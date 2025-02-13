@@ -39,6 +39,24 @@ You can also use any provider that supports the OpenAI format for embedding API.
 
 _If both `REFER_API_KEY` environment variable and `api_key` config value is set, the env variable takes precedence._
 
+### Embedding API
+
+The embedding API can be any server that provides an interface compliant with the [OpenAI embeddings specification](https://platform.openai.com/docs/api-reference/embeddings), such as Ollama or OpenAI.
+
+By default, `refer` is configured to use Ollama, which is recommended since most machines can efficiently run an embedding model without any cost, rate limits, or privacy concerns. For setup instructions, please visit [Ollama](https://ollama.com).
+
+If you'd like to use the OpenAI API instead, configure it with the following settings:
+
+```json
+{
+    "embedding_base_url": "https://api.openai.com/v1/embeddings",
+    "embedding_model": "text-embedding-v1",
+    "api_key": "<your openai api key>"
+}
+```
+
+For other providers, please consult their respective documentation.
+
 ## Authorization
 
 You can optionally set the `REFER_API_KEY` environment variable to provide an authorization token for the API. This token will be included in the request header as `Authorization: Bearer $REFER_API_KEY`. If you are using Ollama, you can keep this variable empty.
