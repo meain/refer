@@ -238,6 +238,7 @@ func main() {
 			}
 		}
 
+		// Sort by distance
 		slices.SortFunc(docs, func(i, j internal.Document) int {
 			return int((i.Distance - j.Distance) * 1000)
 		})

@@ -48,6 +48,9 @@ type Response struct {
 	} `json:"results"`
 }
 
+// Does not work reliably in most cases as the model cannot handle
+// large inputs. It seems to only be working on a very small set of data
+// and so is unusable in most cases.
 func RerankDocuments(query string, documents []Document, top int) ([]Document, error) {
 	requestDocuments := []string{}
 	for _, doc := range documents {
