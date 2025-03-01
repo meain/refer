@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -214,12 +215,17 @@ func main() {
 		}
 
 		// de-dupe documents
-		seen := map[string]bool{}
+		distances := map[string]float64{}
 		uniqueDocs := []internal.Document{}
 		for _, doc := range docs {
-			if _, ok := seen[doc.Path]; !ok {
-				seen[doc.Path] = true
+			distance, ok := distances[doc.Path]
+			if !ok {
+				distances[doc.Path] = doc.Distance
 				uniqueDocs = append(uniqueDocs, doc)
+			} else {
+				if doc.Distance < distance {
+					distances[doc.Path] = doc.Distance
+				}
 			}
 		}
 
@@ -231,6 +237,10 @@ func main() {
 				log.Fatalf("Failed to rerank documents: %v", err)
 			}
 		}
+
+		slices.SortFunc(docs, func(i, j internal.Document) int {
+			return int((i.Distance - j.Distance) * 1000)
+		})
 
 		switch cli.Search.Format {
 		case "names":
@@ -385,7 +395,6 @@ func main() {
 		panic("Unexpected command: " + kctx.Command())
 	}
 }
-
 func formatBytes(bytes int) string {
 	const unit = 1024
 	if bytes < unit {
