@@ -183,16 +183,13 @@ func isTextFile(filePath string) bool {
 		data = data[:512]
 	}
 
+	// Only check for null bytes which typically indicate binary files
 	for _, b := range data {
-		if b == 0 || (b > 127 && !isPrintable(b)) {
+		if b == 0 {
 			return false
 		}
 	}
 	return true
-}
-
-func isPrintable(b byte) bool {
-	return (b >= 32 && b <= 126) || (b >= 192 && b <= 255)
 }
 
 func extractTitle(htmlContent string) string {
