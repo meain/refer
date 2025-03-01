@@ -230,14 +230,25 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 		return fmt.Errorf("fetch document %s: %w", path, err)
 	}
 
+	existingDoc := GetDocumentByPath(db, doc.Path)
+	if existingDoc != nil && existingDoc.Content == doc.Content {
+		fmt.Printf("Document already exists and not modified: %s\n", doc.Path)
+		return nil
+	}
+
+	if doc.Content == "" {
+		fmt.Printf("Document is empty: %s\n", doc.Path)
+		return nil
+	}
+
 	// Generate and serialize embedding
-	embedding, err := createAndSerializeEmbedding(ctx, doc.Content)
+	embedding, err := CreateAndSerializeEmbedding(ctx, doc.Content)
 	if err != nil {
 		return err
 	}
 
 	// Update database
-	if err := updateDocument(db, doc, embedding); err != nil {
+	if err := UpdateDocument(db, doc, embedding); err != nil {
 		return err
 	}
 
@@ -245,7 +256,7 @@ func AddDocument(ctx context.Context, db *sql.DB, path string) error {
 	return nil
 }
 
-func createAndSerializeEmbedding(ctx context.Context, content string) ([]byte, error) {
+func CreateAndSerializeEmbedding(ctx context.Context, content string) ([]byte, error) {
 	embedding, err := CreateEmbedding(ctx, content)
 	if err != nil {
 		return nil, fmt.Errorf("create embedding: %w", err)
@@ -259,7 +270,7 @@ func createAndSerializeEmbedding(ctx context.Context, content string) ([]byte, e
 	return serialized, nil
 }
 
-func updateDocument(db *sql.DB, doc *Document, embedding []byte) error {
+func UpdateDocument(db *sql.DB, doc *Document, embedding []byte) error {
 	// Delete existing document if it exists
 	_, err := db.Exec("DELETE FROM documents WHERE filepath = ?", doc.Path)
 	if err != nil {

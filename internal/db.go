@@ -65,6 +65,16 @@ func GetAllFilePaths(db *sql.DB) ([]string, error) {
 	return filepaths, nil
 }
 
+func GetDocumentEmbedding(db *sql.DB, id int64) ([]byte, error) {
+	var embedding []byte
+	err := db.QueryRow("SELECT embedding FROM documents WHERE rowid = ?", id).Scan(&embedding)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query embedding: %v", err)
+	}
+
+	return embedding, nil
+}
+
 // CreateDB creates or opens a SQLite database at the given path.
 // Returns the database connection, a boolean indicating if it's a new database,
 // and any error that occurred.
@@ -245,6 +255,22 @@ func GetDocumentByID(db *sql.DB, id int) (*Document, error) {
 		return nil, fmt.Errorf("failed to query document: %w", err)
 	}
 	return &doc, nil
+}
+
+// GetDocumentByPath retrieves a single document by its path
+func GetDocumentByPath(db *sql.DB, path string) *Document {
+	var doc Document
+	err := db.QueryRow(`
+		SELECT rowid, filepath, content, title
+		FROM documents
+		WHERE filepath = ?`, path).Scan(&doc.ID, &doc.Path, &doc.Content, &doc.Title)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return nil
+	}
+	return &doc
 }
 
 // RemoveDocument removes a document by its ID

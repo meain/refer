@@ -223,13 +223,19 @@ func main() {
 
 		embeddingSize := len(sampleEmbedding)
 
-		docs, err := internal.RecreateDatabase(database, embeddingSize)
+		tempFile := os.TempDir() + "referdb"
+		tempDB, _, err := internal.CreateDB(tempFile)
 		if err != nil {
-			log.Fatalf("Failed to reindex database: %v", err)
+			log.Fatalf("Failed to create database: %v", err)
+		}
+
+		err = internal.InitDatabase(tempDB, len(sampleEmbedding))
+		if err != nil {
+			log.Fatalf("Failed to initialize database: %v", err)
 		}
 
 		err = internal.SaveConfig(
-			database,
+			tempDB,
 			map[string]string{
 				"embedding_model": internal.Model,
 				"embedding_size":  fmt.Sprintf("%d", embeddingSize),
@@ -238,14 +244,83 @@ func main() {
 			log.Fatalf("Failed to save config: %v", err)
 		}
 
-		// Process documents in parallel
-		if errors := internal.AddDocuments(ctx, database, docs, 5); len(errors) > 0 {
-			for _, err := range errors {
-				log.Printf("Error during reindex: %v", err)
+		originalConfig, err := internal.GetConfig(database)
+		if err != nil {
+			log.Fatalf("Failed to get config: %v", err)
+		}
+
+		originalCount := 0
+		changedCount := 0
+
+		if originalConfig["embedding_model"] != internal.Model ||
+			originalConfig["embedding_size"] != fmt.Sprintf("%d", embeddingSize) {
+			// Re-embed everything
+			docs, err := internal.GetAllFilePaths(database)
+			if err != nil {
+				log.Fatalf("Failed to get existing documents: %v", err)
+			}
+
+			if errors := internal.AddDocuments(ctx, tempDB, docs, 5); len(errors) > 0 {
+				for _, err := range errors {
+					log.Printf("Error during reindex: %v", err)
+				}
+			}
+
+			originalCount = len(docs)
+			changedCount = originalCount
+		} else {
+			// Re-embed only changed items
+			docs, err := internal.GetAllDocuments(database)
+			if err != nil {
+				log.Fatalf("Failed to get existing documents: %v", err)
+			}
+
+			originalCount = len(docs)
+
+			for _, doc := range docs {
+				newDoc, err := internal.FetchDocument(doc.Path)
+				if err != nil {
+					log.Fatalf("Failed to fetch document %s: %v", doc.Path, err)
+				}
+
+				fmt.Println(newDoc.Path, newDoc.Content != doc.Content)
+
+				if newDoc.Content != doc.Content {
+					emb, err := internal.CreateAndSerializeEmbedding(ctx, newDoc.Content)
+					if err != nil {
+						log.Fatalf("Failed to create embedding for %s: %v", doc.Path, err)
+					}
+
+					err = internal.UpdateDocument(tempDB, newDoc, emb)
+					if err != nil {
+						log.Fatalf("Failed to update document %s: %v", doc.Path, err)
+					}
+
+					changedCount++
+				} else {
+					emb, err := internal.GetDocumentEmbedding(database, doc.ID)
+					if err != nil {
+						log.Fatalf("Failed to get document embedding: %v", err)
+					}
+
+					err = internal.UpdateDocument(tempDB, newDoc, emb)
+					if err != nil {
+						log.Fatalf("Failed to update document %s: %v", doc.Path, err)
+					}
+				}
 			}
 		}
 
-		fmt.Printf("Successfully reindexed %d documents\n", len(docs))
+		tempDB.Close()
+
+		// Move the temporary database to the original location
+		if err := os.Rename(tempFile, cli.Database); err != nil {
+			log.Fatalf("Failed to update database: %v", err)
+		}
+
+		fmt.Println("Successfully reindexed all documents")
+		fmt.Printf("Original documents: %d\n", originalCount)
+		fmt.Printf("Changed documents: %d\n", changedCount)
 	case "show":
 		// List all documents
 		docs, err := internal.GetAllDocuments(database)
