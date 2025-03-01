@@ -280,10 +280,9 @@ func main() {
 			for _, doc := range docs {
 				newDoc, err := internal.FetchDocument(doc.Path)
 				if err != nil {
-					log.Fatalf("Failed to fetch document %s: %v", doc.Path, err)
+					log.Printf("Ignoring missing document: %s", doc.Path)
+					continue
 				}
-
-				fmt.Println(newDoc.Path, newDoc.Content != doc.Content)
 
 				if newDoc.Content != doc.Content {
 					emb, err := internal.CreateAndSerializeEmbedding(ctx, newDoc.Content)
