@@ -9,7 +9,8 @@ import (
 type Config struct {
 	EmbeddingBaseURL string `json:"embedding_base_url"`
 	EmbeddingModel   string `json:"embedding_model"`
-	APIKey           string `json:"api_key,omitempty"` // Added API key field
+	APIKey           string `json:"api_key,omitempty"`
+	RerankerURL      string `json:"reranker_url,omitempty"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -17,6 +18,7 @@ func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		EmbeddingBaseURL: "http://localhost:11434/api/embeddings",
 		EmbeddingModel:   "nomic-embed-text",
+		RerankerURL:      "http://localhost:11435/v1/rerank",
 	}
 
 	// Get config file path
@@ -50,6 +52,12 @@ func LoadConfig() (*Config, error) {
 
 		break // Configuration loaded successfully
 	}
+
+	// Update global variables
+	BaseURL = cfg.EmbeddingBaseURL
+	Model = cfg.EmbeddingModel
+	APIKey = cfg.APIKey
+	RerankerURL = cfg.RerankerURL
 
 	return cfg, nil
 }

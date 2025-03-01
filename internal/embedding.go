@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	BaseURL = "http://localhost:11434/api/embeddings"
-	Model   = "nomic-embed-text"
-	APIKey  = ""
+	BaseURL     = ""
+	Model       = ""
+	APIKey      = ""
+	RerankerURL = "" // using llama-cpp
 )
 
 type EmbeddingRequest struct {

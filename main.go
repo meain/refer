@@ -32,10 +32,11 @@ type Add struct {
 }
 
 type Search struct {
-	Query     string   `arg:"" optional:"" help:"Search query to be executed"`
+	Query     []string `arg:"" optional:"" help:"Search query to be executed. First one will the primary query. Additional queries will be used to fetch more results(useful with rerank)"`
 	Format    string   `default:"names" help:"Format of the search results"`
 	Limit     int      `default:"5" help:"Maximum number of search results to return"`
 	Threshold *float64 `help:"Maximum distance threshold for search results (20 is a good value)"`
+	Rerank    bool     `help:"Rerank search results based on the query (alpha)"`
 }
 
 type Reindex struct{}
@@ -187,24 +188,48 @@ func main() {
 			log.Fatalf("No input provided")
 		}
 
-		cli.Search.Query = string(input)
+		cli.Search.Query = []string{string(input)}
 
 		fallthrough
 	case "search <query>":
-		// Generate embedding for search query
-		queryEmbedding, err := internal.CreateEmbedding(ctx, cli.Search.Query)
-		if err != nil {
-			log.Fatalf("Failed to create query embedding: %v", err)
+		docs := []internal.Document{}
+		for _, query := range cli.Search.Query {
+			// Generate embedding for search queries
+			queryEmbedding, err := internal.CreateEmbedding(ctx, query)
+			if err != nil {
+				log.Fatalf("Failed to create query embedding: %v", err)
+			}
+
+			// Perform search
+			sdocs, err := internal.SearchDocuments(
+				database,
+				queryEmbedding,
+				cli.Search.Limit,
+				cli.Search.Threshold)
+			if err != nil {
+				log.Fatalf("Search failed: %v", err)
+			}
+
+			docs = append(docs, sdocs...)
 		}
 
-		// Perform search
-		docs, err := internal.SearchDocuments(
-			database,
-			queryEmbedding,
-			cli.Search.Limit,
-			cli.Search.Threshold)
-		if err != nil {
-			log.Fatalf("Search failed: %v", err)
+		// de-dupe documents
+		seen := map[string]bool{}
+		uniqueDocs := []internal.Document{}
+		for _, doc := range docs {
+			if _, ok := seen[doc.Path]; !ok {
+				seen[doc.Path] = true
+				uniqueDocs = append(uniqueDocs, doc)
+			}
+		}
+
+		docs = uniqueDocs
+
+		if cli.Search.Rerank {
+			docs, err = internal.RerankDocuments(cli.Search.Query[0], docs, cli.Search.Limit)
+			if err != nil {
+				log.Fatalf("Failed to rerank documents: %v", err)
+			}
 		}
 
 		switch cli.Search.Format {
