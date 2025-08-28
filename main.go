@@ -29,7 +29,7 @@ type CLI struct {
 
 type Add struct {
 	FilePath []string `arg:"" required:"" help:"File, directory or URL to add to the database"`
-	Ignore   bool     `help:"Ignore files that are ignored by git"`
+	NoIgnore bool     `help:"Do not ignore files that are ignored by git"`
 }
 
 type Search struct {
@@ -129,7 +129,7 @@ func main() {
 				allPaths = append(allPaths, f)
 			} else {
 				var matcher gitignore.Matcher
-				if cli.Add.Ignore {
+				if !cli.Add.NoIgnore {
 					gitDir, err := internal.FindGitDir(f)
 					if err == nil {
 						patterns, err := internal.LoadGitignorePatterns(gitDir)
